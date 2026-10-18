@@ -78,7 +78,7 @@ def main() -> None:
     rt_tid = int(re.search(r"rt_tid=(\d+)", meta)[1])
     print(meta.strip())
     counters = (args.out / "counters.txt").read_text().splitlines() if (args.out / "counters.txt").exists() else []
-    for trace in sorted(args.out.glob("*.trace"), key=lambda p: ["off", "log0", "log1", "log5"].index(p.stem) if p.stem in ("off", "log0", "log1", "log5") else 9):
+    for trace in sorted(args.out.glob("*.trace"), key=lambda p: ["asis", "off", "log0", "log1", "log5"].index(p.stem) if p.stem in ("asis", "off", "log0", "log1", "log5") else 9):
         result = analyse(trace, rt_tid, args.period_us)
         print(f"\n== {trace.stem}")
         for key, value in result.items():

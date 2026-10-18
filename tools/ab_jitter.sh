@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # A/B: RT-thread scheduling period on the isolated CPU vs Runtime-LOG polling settings.
 # Usage (on the IPC, stack in OP and DISABLED, nobody operating): tools/ab_jitter.sh <out_dir> [seconds] [phases...]
-# Phases: off (service stopped) | log0 | log1 | log5 (service with master polling 0/1/5 Hz).
+# Phases: asis (no change) | off (service stopped) | log0 | log1 | log5 (service with master polling 0/1/5 Hz).
 # Only reads: ftrace sched_switch on the RT CPU in a private tracefs instance, `ethercat master`.
 set -euo pipefail
 out="$1"; secs="${2:-180}"; shift 2 || true
@@ -38,6 +38,7 @@ counters() { ethercat master 2>/dev/null | awk '/Common:/{c=1} c&&/Tx frames:|Rx
 
 for phase in "${phases[@]}"; do
   case "$phase" in
+    asis) ;;  # measure the system as it is (e.g. recorder controller A/B across two stack starts)
     off) systemctl --user stop runtime-log ;;
     log0) printf 'RUNTIME_LOG_SERVE_ARGS=--ethercat-hz 0\n' > "$env_file"; systemctl --user restart runtime-log ;;
     log1) printf 'RUNTIME_LOG_SERVE_ARGS=--ethercat-hz 1,1\n' > "$env_file"; systemctl --user restart runtime-log ;;
