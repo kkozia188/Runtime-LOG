@@ -17,7 +17,7 @@ LINE = re.compile(
     r"next_comm=(?P<next_comm>.+?) next_pid=(?P<next_pid>\d+) next_prio=(?P<next_prio>\d+)"
 )
 # Expected visitors of an isolated RT CPU: idle, per-CPU kernel threads.
-KERNEL_PER_CPU = re.compile(r"^(swapper/\d+|migration/\d+|ksoftirqd/\d+|kworker/\d+:.*|cpuhp/\d+|rcuc/\d+|ktimers/\d+|irq_work/\d+|idle_inject/\d+)$")
+KERNEL_PER_CPU = re.compile(r"^(swapper/\d+|migration/\d+|ksoftirqd/\d+|kworker/\d+:.*|cpuhp/\d+|rcuc/\d+|ktimers/\d+|irq_work/\d+|idle_inject/\d+|EtherCAT-OP|EtherCAT-IDLE)$")
 
 
 def percentile(values: list[float], fraction: float) -> float:
