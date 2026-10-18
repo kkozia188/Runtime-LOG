@@ -35,6 +35,19 @@ def _value(value) -> str:
     return esc(value)
 
 
+# Picks are remembered across pages (localStorage) so experiments of different runs can be compared.
+EXPERIMENT_PICKER = """<p><a id="expCompare" href="#" style="display:none">对比所选两次实验</a> <span class="k" id="expPicked"></span></p>
+<script>
+(function(){const key='rl_exp_picks';const load=()=>JSON.parse(localStorage.getItem(key)||'[]');
+function show(){const p=load();const a=document.getElementById('expCompare');document.getElementById('expPicked').textContent=p.length?'已选：'+p.join('，'):'勾选两次实验后对比（可跨运行）';
+a.style.display=p.length===2?'':'none';if(p.length===2)a.href='/compare_experiments?a='+encodeURIComponent(p[0])+'&b='+encodeURIComponent(p[1]);
+document.querySelectorAll('.exp-pick').forEach(c=>c.checked=p.includes(c.value));}
+document.addEventListener('change',e=>{if(!e.target.classList.contains('exp-pick'))return;let p=load().filter(x=>x!==e.target.value);
+if(e.target.checked){p.push(e.target.value);while(p.length>2)p.shift();}localStorage.setItem(key,JSON.stringify(p));show();});
+document.addEventListener('DOMContentLoaded',show);show();})();
+</script>"""
+
+
 def experiments_of(run: dict) -> list[dict]:
     rows = []
     for box in run.get("blackbox") or []:
@@ -58,7 +71,8 @@ def experiments_section(run: dict, run_dir: Optional[Path]) -> str:
                 meta = {}
         unsettled = summary.get("unsettled") or []
         body.append(
-            f'<tr class="{"warn" if unsettled else ""}"><td class="num">{(row.get("start") or t0) - t0:.3f}</td>'
+            f'<tr class="{"warn" if unsettled else ""}"><td><input type="checkbox" class="exp-pick" value="{esc(run.get("id"))}/{esc(row["dir"])}"></td>'
+            f'<td class="num">{(row.get("start") or t0) - t0:.3f}</td>'
             f'<td><a href="experiments/{esc(row["dir"])}/">{esc(row["name"])}</a></td><td>{esc(row.get("source"))}</td>'
             f'<td>{esc(meta.get("intent", ""))}</td><td class="num">{row.get("duration_s", 0):.2f}</td>'
             f'<td class="num">{summary.get("moving_joints", 0)}</td>'
@@ -67,7 +81,7 @@ def experiments_section(run: dict, run_dir: Optional[Path]) -> str:
             f'<td class="num">{_value(summary.get("max_overshoot_deg"))}</td><td>{esc(", ".join(unsettled))}</td>'
             f'<td><a href="experiments/{esc(row["dir"])}/data.mcap">data.mcap</a></td></tr>'
         )
-    return ('<table><tr><th>t (s)</th><th>实验</th><th>来源</th><th>操作</th><th>时长 s</th><th>运动关节</th><th>最大跟随误差 °</th>'
+    return (EXPERIMENT_PICKER + '<table><tr><th></th><th>t (s)</th><th>实验</th><th>来源</th><th>操作</th><th>时长 s</th><th>运动关节</th><th>最大跟随误差 °</th>'
             '<th>最慢到位 s</th><th>最大超调 °</th><th>未到位</th><th>数据</th></tr>' + "".join(body) + "</table>")
 
 

@@ -144,5 +144,7 @@ def _index_row(run: dict) -> dict:
         "anomaly_total": summary.get("anomaly_total", 0),
         "anomalies": summary.get("anomalies", {}),
         "peak_cpu": run.get("resources", {}).get("peak_cpu_percent"),
+        "blackbox_saved": sum(len(box.get("saved") or []) for box in run.get("blackbox") or []),
+        "experiments": sum(len(box.get("experiments") or []) for box in run.get("blackbox") or []),
         "source": run.get("source", "live"),
     }

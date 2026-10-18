@@ -54,7 +54,8 @@ def render_index(index: dict) -> str:
             f'<td class="num">{fmt_s(run.get("duration_s"))}</td><td class="num">{fmt_s(run.get("ready_s"))}</td>'
             f'<td>{detail}</td><td>{esc(run.get("last_stage"))}</td>'
             f'<td class="num">{sum(anomalies.values()) or ""}</td><td class="mono">{esc(top)}</td>'
-            f'<td class="num">{esc(run.get("peak_cpu") if run.get("peak_cpu") is not None else "")}</td><td>{esc(run.get("source"))}</td></tr>'
+            f'<td class="num">{esc(run.get("peak_cpu") if run.get("peak_cpu") is not None else "")}</td>'
+            f'<td class="num">{run.get("blackbox_saved") or ""}</td><td class="num">{run.get("experiments") or ""}</td><td>{esc(run.get("source"))}</td></tr>'
         )
     running = any(run.get("result") == "running" for run in runs)
     refresh = '<meta http-equiv="refresh" content="10">' if running else ""
@@ -68,8 +69,8 @@ def render_index(index: dict) -> str:
 <label>硬件 <select id="fHw"><option value="">全部</option><option>ethercat</option><option>mock</option></select></label>
 <label><input id="fAnomaly" type="checkbox"> 只看有异常</label><label>搜索 <input id="fText" size="24"></label></div>
 <p><button id="compareBtn" disabled>对比所选两次运行</button> <span class="k">勾选两行后对比（先选的为 A）</span></p>
-<table id="runs"><tr><th></th><th>开始</th><th>运行</th><th>scope</th><th>域</th><th>硬件</th><th>结果</th><th>时长</th><th>就绪</th><th>失败步骤</th><th>最后成功步骤</th><th>异常</th><th>主要异常</th><th>峰值 CPU%</th><th>来源</th></tr>
-{"".join(rows) or '<tr><td colspan="15">还没有运行记录</td></tr>'}</table></main>
+<table id="runs"><tr><th></th><th>开始</th><th>运行</th><th>scope</th><th>域</th><th>硬件</th><th>结果</th><th>时长</th><th>就绪</th><th>失败步骤</th><th>最后成功步骤</th><th>异常</th><th>主要异常</th><th>峰值 CPU%</th><th>黑匣子</th><th>实验</th><th>来源</th></tr>
+{"".join(rows) or '<tr><td colspan="17">还没有运行记录</td></tr>'}</table></main>
 <script>
 const rows=[...document.querySelectorAll('#runs tr[data-result]')];
 function apply(){{const r=fResult.value,h=fHw.value,a=fAnomaly.checked,t=fText.value.toLowerCase();
