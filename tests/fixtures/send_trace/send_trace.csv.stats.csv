@@ -1,0 +1,4 @@
+phase,samples,gaps,min_gap_ns,max_gap_ns,wkc_incomplete,nonmonotonic
+startup,3322,3321,972133,1005383,3009,0
+maintenance,2,1,1198978,1198978,0,0
+control,48868,48867,584850,1418079,0,0

@@ -24,6 +24,7 @@ from .blackbox import BlackBox
 from .blackbox import Settings as BlackBoxSettings
 from .procfs import CpuSampler, ProcFS
 from .profile import Profile
+from .sendtrace import read_send_trace
 from .poststop import read_post_stop
 from .poststop import summarize as summarize_post_stop
 from .shm import SHM_DIR
@@ -217,6 +218,9 @@ class RunRecorder:
             if path.endswith(suffix) and Path(path).parent.is_dir():
                 self.artifact = artifact_info(Path(path).parent)
         self.mock, self.uses_ethercat = hardware_kind(self.artifact, self.profile.run, self.args)
+        trace = self.proc.environ(pid).get("RT_CONTROL_ECAT_TRACE_FILE")
+        if trace:
+            self.document["send_trace_path"] = trace
         self.document.update(
             {
                 "control_pid": pid,
@@ -431,6 +435,10 @@ class RunRecorder:
             summary["anomalies"]["cycle.overruns"] = overruns
         if gaps:
             summary["anomalies"]["blackbox.reader_gaps"] = gaps
+        trace = self.document.get("send_trace") or {}
+        burst = sum(phase.get("gaps_below_burst", 0) for phase in (trace.get("phases") or {}).values())
+        if burst:
+            summary["anomalies"]["ecat.send_burst"] = burst
         expected_codes = (self.profile.ethercat.get("post_stop") or {}).get("expected_codes") or []
         summary["anomalies"].update(summarize_post_stop(self.document.get("post_stop"), expected_codes))
         summary["anomalies"] = dict(sorted(summary["anomalies"].items()))
@@ -472,6 +480,8 @@ class RunRecorder:
             if not box.reader.writer_alive():
                 box.reader.close()
                 box.path.unlink(missing_ok=True)
+        if self.document.get("send_trace_path"):
+            self.document["send_trace"] = read_send_trace(Path(self.document["send_trace_path"]))
         post_stop = self.profile.ethercat.get("post_stop") or {}
         if not interrupted and self.uses_ethercat and not self.mock and self.poller is not None and post_stop.get("enabled"):
             result = read_post_stop(self.poller, post_stop)

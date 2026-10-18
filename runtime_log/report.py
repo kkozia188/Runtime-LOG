@@ -242,6 +242,25 @@ def counters_table(ecat_rows: list[dict]) -> str:
     return f'<table><tr><th>计数</th><th>首次采样</th><th>末次采样</th><th>本次运行增量</th></tr>{cells}</table>{note}<p class="k">采样 {len(rows)} 次，{rows[0]["t"]:.1f}–{rows[-1]["t"]:.1f} s。</p>'
 
 
+def send_trace_section(run: dict) -> str:
+    trace = run.get("send_trace")
+    if not trace:
+        return ""
+    rows = "".join(
+        f'<tr class="{"hit" if p.get("gaps_below_burst") else ""}"><td>{esc(name)}</td><td class="num">{p.get("samples", 0)}</td>'
+        f'<td class="num">{p.get("min_gap_ns", 0) / 1e3:.1f}</td><td class="num">{p.get("max_gap_ns", 0) / 1e3:.1f}</td>'
+        f'<td class="num">{p.get("gaps_below_burst", 0)}</td><td class="num">{p.get("gaps_above_1_5x", 0)}</td><td class="num">{p.get("wkc_incomplete", 0)}</td></tr>'
+        for name, p in (trace.get("phases") or {}).items()
+    )
+    window = trace.get("handoff_window") or []
+    cells = " ".join(f'{w["phase"][0]}{w["t_us"]:+.0f}' for w in window)
+    return (
+        '<h2>EtherCAT 发送轨迹（交接取证）</h2><table><tr><th>阶段</th><th>发送次数</th><th>最小间隔 µs</th><th>最大间隔 µs</th>'
+        f'<th>&lt;500 µs（连发）</th><th>&gt;1.5 ms</th><th>WKC 不完整</th></tr>{rows}</table>'
+        f'<p class="k mono">交接前后发送时刻（s=启动 m=交接 c=控制，相对第一帧控制 µs）：{esc(cells)}</p>'
+    )
+
+
 def post_stop_section(run: dict) -> str:
     result = run.get("post_stop")
     if not result:
@@ -377,6 +396,7 @@ def render(run: dict, events: list[Event], run_dir: Optional[Path] = None) -> st
 <h2>异常计数</h2><table style="max-width:520px"><tr><th>项目</th><th>次数</th></tr>{anomaly_rows}</table>
 <h2>1 kHz 黑匣子</h2>{blackbox_section(run, events, t0)}
 <h2>停后驱动错误码</h2>{post_stop_section(run)}
+{send_trace_section(run)}
 {zoom}<h2>时间线（全程）</h2>{gantt(summary, events, ecat_rows, t0, t_max)}
 <h2>启动步骤</h2><table><tr><th>t (s)</th><th>步骤</th><th>原文</th></tr>{stage_rows or '<tr><td colspan="3">无</td></tr>'}</table>
 <h2>资源</h2>{line_chart(cpu, t_max, "%", "进程 CPU（%，单核 = 100）")}{line_chart(rss, t_max, " MiB", "进程常驻内存（MiB）")}{line_chart(threads, t_max, "%", "ros2_control_node 线程 CPU（前 8）")}
