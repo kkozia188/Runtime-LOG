@@ -57,6 +57,7 @@ def decode(fields: dict, enums: dict) -> dict:
     joints: dict = {}
     bus: dict = {}
     states: dict = {}
+    values: dict = {}
     for name, value in fields.items():
         prefix, _, interface = name.rpartition("/")
         if name in enums:
@@ -69,7 +70,7 @@ def decode(fields: dict, enums: dict) -> dict:
         elif prefix and interface:
             joints.setdefault(prefix, {})[interface] = value
         else:
-            states[name] = {"title": name, "name": _num(value), "label": str(_num(value))}
+            values[name] = _num(value)
     rows = []
     for joint, values in sorted(joints.items()):
         row = {"joint": joint}
@@ -90,7 +91,7 @@ def decode(fields: dict, enums: dict) -> dict:
         if "control_word_sent" in values and values["control_word_sent"] == values["control_word_sent"]:
             row["control_word"] = f"0x{int(values['control_word_sent']):04X}"
         rows.append(row)
-    return {"joints": rows, "bus": bus, "states": states}
+    return {"joints": rows, "bus": bus, "states": states, "values": values}
 
 
 PAGE = """<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
@@ -113,7 +114,8 @@ function render(data){
         `<td class="num">${f(j.error_deg,4)}</td><td class="num">${f(j.velocity_deg_s,2)}</td><td class="num">${f(j.torque_permille,0)}</td>`+
         `<td class="mono ${j.error_code&&j.error_code!=='0x0000'?'bad':''}">${f(j.error_code)}</td><td class="mono">${f(j.control_word)}</td></tr>`).join('')+'</table>':'';
       const bus=s.bus&&Object.keys(s.bus).length?`<p class="mono">WKC 错误 ${f(s.bus.wc_error_count,0)} · 过程数据年龄 ${f(s.bus.process_data_age_ms,3)} ms · 应答从站 ${f(s.bus.slaves_responding,0)} · 链路 ${s.bus.link_up===1?'UP':f(s.bus.link_up,0)} · AL ${Object.entries(s.bus.al_states||{}).map(([k,v])=>k+':'+v).join(' ')}</p>`:'';
-      return `<div class="card"><b>${s.writer}</b> <span class="tag">段 ${s.state} · 周期 #${s.seq} · 实际周期 ${s.period_us} µs · 数据滞后 ${f(s.age_s,3)} s</span><p>${states}</p>${bus}${joints}</div>`;
+      const vals=Object.entries(s.values||{}).map(([k,v])=>`${k}=${v===null?'-':v}`).join(' · ');
+      return `<div class="card"><b>${s.writer}</b> <span class="tag">段 ${s.state} · 周期 #${s.seq} · 实际周期 ${s.period_us} µs · 数据滞后 ${f(s.age_s,3)} s</span><p>${states}</p>${vals?`<p class="mono k">${vals}</p>`:''}${bus}${joints}</div>`;
     }).join('');
     return `<h2><a href="/${run.id}/">${run.id}</a> <span class="tag">${run.scope} · 域 ${run.domain}</span></h2>${segs||'<p class="k">该运行没有记录段。</p>'}`;
   }).join('');
