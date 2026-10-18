@@ -168,9 +168,10 @@ def gantt(summary: dict, events: list[Event], ecat_rows: list[dict], t0: float, 
                 timeline.setdefault(int(pos), []).append((record["t"], state))
         for pos in sorted(timeline):
             row_label(f"从站 {pos}")
-            samples = timeline[pos]
+            samples = [s for i, s in enumerate(timeline[pos]) if i == 0 or s[1] != timeline[pos][i - 1][1]]
+            last_t = timeline[pos][-1][0]
             for index, (t, state) in enumerate(samples):
-                t_next = samples[index + 1][0] if index + 1 < len(samples) else t + 1.0
+                t_next = samples[index + 1][0] if index + 1 < len(samples) else last_t + 1.0
                 base = state.rstrip("E")
                 x1, x2 = scale.x(t), scale.x(t_next)
                 fill = STATE_COLOR.get(base, "#ffffff")
