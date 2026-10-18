@@ -12,8 +12,12 @@ T=/sys/kernel/tracing; I="$T/instances/runtime_log_ab"
 env_file="$HOME/.config/runtime-log.env"
 cp "$env_file" "$out/runtime-log.env.before"
 sudo() { command sudo -n "$@"; }
+# Prime sudo before running (sudo -v); keep the credential alive for the whole test.
+command sudo -n -v || { echo "run 'sudo -v' first" >&2; exit 1; }
+( while sleep 60; do command sudo -n -v || exit; done ) & keepalive=$!
 
 cleanup() {
+  kill "$keepalive" 2>/dev/null || true
   sudo sh -c "echo 0 > $I/tracing_on" 2>/dev/null || true
   sudo rmdir "$I" 2>/dev/null || true
   cp "$out/runtime-log.env.before" "$env_file"
