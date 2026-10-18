@@ -124,6 +124,8 @@ class RunRecorder:
         self.peak_rss_kib = 0
         self.threads: dict[int, dict] = {}
         self.ended: Optional[float] = None
+        if previous:
+            self._restore_polled_events()
         self.document = {
             "id": self.id,
             "source": "live",
@@ -154,6 +156,28 @@ class RunRecorder:
         except FileNotFoundError:
             return None
         return None
+
+    def _restore_polled_events(self) -> None:
+        """Service restart inside a run: rebuild polled events and continue the counter baseline."""
+        path = self.dir / "ethercat.jsonl"
+        if not path.exists():
+            return
+        rows = []
+        for line in path.read_text(encoding="utf-8").splitlines():
+            try:
+                rows.append(json.loads(line))
+            except json.JSONDecodeError:
+                continue
+        for row in rows:
+            if not row.get("counters"):
+                continue
+            event = counter_event(row["ts"], self.counters.update(row["counters"]))
+            if event is not None:
+                self._emit(event)
+            states = row.get("states")
+            if states and states != self.last_slave_states:
+                self._emit(Event(row["ts"], "ecat", "ethercat", "slaves", states, "info", rule="slave_states_polled", label="从站状态（轮询）"))
+                self.last_slave_states = states
 
     def _emit(self, event: Event) -> None:
         self.events.append(event)

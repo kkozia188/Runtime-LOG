@@ -204,6 +204,23 @@ def test_discovery_matches_only_rt_control_launches(tmp_path, profile, artifact_
     assert Discovery(proc, profile.run["launch_match"]).scan() == []
 
 
+def test_service_restart_reuses_the_run_and_keeps_polled_events(tmp_path, profile, artifact_dir):
+    log_dir = tmp_path / f"2026-10-18-14-47-48-1-ar-Default-string-{LAUNCH_PID}"
+    log_dir.mkdir()
+    (log_dir / "launch.log").write_text((FIXTURES / "launch_normal.log").read_text())
+    archive = Archive(tmp_path / "runs")
+    proc = FakeProc(artifact_dir)
+    first = RunRecorder(LAUNCH_PID, log_dir, profile, archive, proc, fake_poller()[0])
+    first.tick(first.start + 1)
+    first.tick(first.start + 2)
+    first.flush(first.start + 2)
+    first.ecat_out.close()
+    second = RunRecorder(LAUNCH_PID, log_dir, profile, archive, proc, fake_poller()[0])
+    assert second.id == first.id
+    assert [e.rule for e in second.events].count("slave_states_polled") == 1
+    assert second.counters.high["tx_frames"] == 108821609
+
+
 def test_counter_events_from_archived_rows_ignore_in_flight_dips():
     from runtime_log.recorder import counter_events
 
