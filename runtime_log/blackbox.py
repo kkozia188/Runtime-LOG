@@ -18,6 +18,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Callable, Optional
 
+from . import cia402
 from .shm import ShmReader
 
 LOG = logging.getLogger("runtime_log.blackbox")
@@ -27,6 +28,14 @@ SLOT_HEAD = struct.Struct("<Qqq")
 # Status word (CiA 402): Fault = bit 3; Operation Enabled = (sw & 0x6F) == 0x27.
 FAULT_BIT = 0x08
 AL_OP = 8
+
+
+# Reasons that an orderly disable makes expected; a stop additionally explains power and quick stop.
+EXPLAINED_BY_DISABLE = frozenset({
+    "left_operation_enabled", "slave_left_op", "process_data_stale", "link_down", "slaves_responding_drop",
+    "writer_stalled", "writer_died", "kernel_error", "wkc_error", "cycle_overrun",
+})
+EXPLAINED_BY_SHUTDOWN = EXPLAINED_BY_DISABLE | {"power_lost", "quick_stop"}
 
 
 @dataclass
@@ -107,13 +116,19 @@ class TriggerScanner:
         for joint, i in self.status:
             word = int(value(i))
             before = self._edge(f"sw:{joint}", word)
-            if before is None:
+            if before is None or int(before) == word:
                 continue
             before = int(before)
+            old_state, new_state = cia402.state(before), cia402.state(word)
+            change = f"{joint} {cia402.describe(before)} -> {cia402.describe(word)}"
             if word & FAULT_BIT and not before & FAULT_BIT:
-                add("drive_fault", f"{joint} status 0x{word:04X}")
-            if (before & 0x6F) == 0x27 and (word & 0x6F) != 0x27:
-                add("left_operation_enabled", f"{joint} 0x{before:04X} -> 0x{word:04X}")
+                add("drive_fault", change)
+            if old_state == "operation_enabled" and new_state != "operation_enabled":
+                add("left_operation_enabled", change)
+            if before & cia402.VOLTAGE_ENABLED and not word & cia402.VOLTAGE_ENABLED and old_state in cia402.POWERED_STATES:
+                add("power_lost", change)
+            if new_state == "quick_stop_active" and old_state != "quick_stop_active":
+                add("quick_stop", change)
         for slave, i in self.al:
             state = value(i)
             before = self._edge(f"al:{slave}", state)
@@ -141,6 +156,9 @@ class TriggerScanner:
             if before == 1.0 and link != 1.0:
                 add("link_down")
         return found
+
+    def drive_states(self) -> dict:
+        return {key[3:]: cia402.decode(int(word)) for key, word in self.previous.items() if key.startswith("sw:")}
 
     def summary(self) -> dict:
         stats = dict(self.stats)
@@ -195,6 +213,7 @@ class BlackBox(threading.Thread):
             "fields": len(self.reader.fields),
             "gaps": self.gaps,
             "cycle_stats": self.scanner.summary(),
+            "drive_states": self.scanner.drive_states(),
             "saved": list(self.saved),
             "expected_transitions": list(self.expected[-50:]),
         }
@@ -279,9 +298,8 @@ class BlackBox(threading.Thread):
         t_first = first.time_ns / 1e9
         reasons = sorted({t.reason for t in pending.triggers})
         explanation = self.explain(t_first - 1.0, pending.triggers[-1].time_ns / 1e9 + 2.0)
-        if explanation and set(reasons) <= {"left_operation_enabled", "slave_left_op", "process_data_stale", "link_down",
-                                           "slaves_responding_drop", "writer_stalled", "writer_died", "kernel_error", "wkc_error",
-                                           "cycle_overrun"}:
+        explainable = EXPLAINED_BY_SHUTDOWN if explanation in ("shutdown", "run ended") else EXPLAINED_BY_DISABLE
+        if explanation and set(reasons) <= explainable:
             record = {"time": t_first, "reasons": reasons, "explained_by": explanation}
             self.expected.append(record)
             self.on_event({"kind": "blackbox_expected", "ts": t_first, "reasons": reasons, "explained_by": explanation})

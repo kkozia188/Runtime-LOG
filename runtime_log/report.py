@@ -292,6 +292,14 @@ def blackbox_section(run: dict, events: list[Event], t0: float) -> str:
             f'<td class="num">{stats.get("overruns", 0)}</td><td class="num">{box.get("gaps", 0)}</td>'
             f'<td class="num">{len(box.get("saved") or [])}</td><td class="num">{len(box.get("expected_transitions") or [])}</td></tr>'
         )
+    states = {}
+    for box in boxes:
+        states.update(box.get("drive_states") or {})
+    state_rows = "".join(
+        f'<tr class="{"hit" if s["state"] in ("fault", "fault_reaction_active", "quick_stop_active") else ""}"><td>{esc(joint)}</td><td>{esc(s["label"])}</td>'
+        f'<td class="mono">{esc(s["word"])}</td><td>{"有" if s["voltage_enabled"] else "无"}</td><td>{"是" if s["warning"] else ""}</td></tr>'
+        for joint, s in sorted(states.items())
+    )
     saved = [e for e in events if e.rule == "blackbox_saved"]
     saved_rows = "".join(
         f'<tr class="hit"><td class="num">{e.ts - t0:.3f}</td><td>{esc(", ".join(e.data.get("reasons", [])))}</td><td class="mono">{esc(e.message[:200])}</td>'
@@ -302,6 +310,7 @@ def blackbox_section(run: dict, events: list[Event], t0: float) -> str:
     return (
         '<table><tr><th>共享内存段</th><th>字段</th><th>周期数</th><th>名义周期 µs</th><th>平均 µs</th><th>最小 / 最大 µs</th>'
         '<th>超时（&gt;1.5 倍）</th><th>读者缺口</th><th>已存窗口</th><th>预期内切换</th></tr>' + "".join(rows) + "</table>"
+        + (f'<br><table style="max-width:640px"><tr><th>关节</th><th>驱动状态（最后读到）</th><th>状态字</th><th>动力电</th><th>警告</th></tr>{state_rows}</table>' if state_rows else "")
         + (f'<br><table><tr><th>t (s)</th><th>触发原因</th><th>详情</th><th>文件（前 10 s、后 2 s）</th></tr>{saved_rows}</table>' if saved_rows else '<p class="k">没有触发。</p>')
     )
 

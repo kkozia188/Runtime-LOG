@@ -137,6 +137,26 @@ def test_external_trigger_maps_epoch_time_to_the_cycle(tmp_path):
     assert document["triggers"][0]["seq"] == 2000 and document["reasons"] == ["kernel_error"]
 
 
+def test_power_loss_and_quick_stop_are_triggers_and_states_are_decoded(tmp_path):
+    pytest.importorskip("mcap")
+    from runtime_log import cia402
+
+    assert cia402.state(0x1637) == "operation_enabled" and cia402.decode(0x1637)["voltage_enabled"]
+    assert cia402.state(0x1250) == "switch_on_disabled" and cia402.state(0x0218) == "fault"
+    assert cia402.state(0x1617) == "quick_stop_active"
+    writer = PyWriter(tmp_path / "seg", FIELDS)
+    box, events = make_box(tmp_path, writer.path)
+    run_cycles(writer, 1500)
+    run_cycles(writer, 700, sw=0x1627)  # main power gone, still reporting Operation Enabled
+    box._step(final=False)
+    assert events[-1]["reasons"] == ["power_lost"]
+    run_cycles(writer, 1500, sw=0x1617)
+    box._step(final=True)
+    assert set(events[-1]["reasons"]) == {"quick_stop", "left_operation_enabled"}
+    states = box.describe()["drive_states"]
+    assert states["left_joint1"]["state"] == "quick_stop_active" and states["left_joint1"]["label"] == "快速停机"
+
+
 def test_reader_rejects_foreign_files(tmp_path):
     path = tmp_path / "junk"
     path.write_bytes(b"x" * 8192)
