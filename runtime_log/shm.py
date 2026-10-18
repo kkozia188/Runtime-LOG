@@ -35,6 +35,13 @@ class Batch:
     head: int
 
 
+@dataclass
+class RawBatch:
+    slots: list[tuple[int, bytes]]
+    gaps: int
+    head: int
+
+
 class ShmReader:
     def __init__(self, path: str | Path):
         self.path = Path(path)
@@ -84,7 +91,23 @@ class ShmReader:
         return True
 
     def read(self, max_cycles: Optional[int] = None) -> Batch:
-        """All cycles committed since the previous call (the first call starts at the oldest safe slot)."""
+        """All cycles committed since the previous call, decoded."""
+        raw = self.read_raw(max_cycles)
+        seqs, times, periods, values = [], [], [], []
+        for seq, slot in raw.slots:
+            _, time_ns, period_ns = SLOT_HEAD.unpack_from(slot, 0)
+            seqs.append(seq)
+            times.append(time_ns)
+            periods.append(period_ns)
+            values.append(self.values.unpack_from(slot, 24))
+        return Batch(seqs, times, periods, values, raw.gaps, raw.head)
+
+    def decode(self, slot: bytes) -> tuple[int, int, tuple]:
+        _, time_ns, period_ns = SLOT_HEAD.unpack_from(slot, 0)
+        return time_ns, period_ns, self.values.unpack_from(slot, 24)
+
+    def read_raw(self, max_cycles: Optional[int] = None) -> "RawBatch":
+        """All cycles committed since the previous call as raw slot bytes (the first call starts at the oldest safe slot)."""
         head = self.head()
         oldest = max(1, head - self.slot_count + 2)  # the slot after head may already be busy
         start = oldest if self.next is None else self.next
@@ -93,7 +116,7 @@ class ShmReader:
             gaps += oldest - start
             start = oldest
         stop = head if max_cycles is None else min(head, start + max_cycles - 1)
-        seqs, times, periods, values = [], [], [], []
+        slots = []
         for seq in range(start, stop + 1):
             offset = self.header_size + (seq % self.slot_count) * self.slot_size
             first = U64.unpack_from(self.map, offset)[0]
@@ -104,13 +127,9 @@ class ShmReader:
             if U64.unpack_from(self.map, offset)[0] != seq:
                 gaps += 1  # rewritten while copying
                 continue
-            _, time_ns, period_ns = SLOT_HEAD.unpack_from(raw, 0)
-            seqs.append(seq)
-            times.append(time_ns)
-            periods.append(period_ns)
-            values.append(self.values.unpack_from(raw, 24))
+            slots.append((seq, raw))
         self.next = stop + 1
-        return Batch(seqs, times, periods, values, gaps, head)
+        return RawBatch(slots, gaps, head)
 
     def close(self) -> None:
         self.map.close()

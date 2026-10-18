@@ -1,0 +1,4 @@
+# Target: Ubuntu 22.04 system python3 (3.10) + python3-yaml from apt.
+# Install for the service user: pip3 install --user -r requirements.txt
+mcap==1.5.0
+zstandard==0.25.0

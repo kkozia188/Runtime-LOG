@@ -17,6 +17,7 @@ from .recorder import load_run
 from .report import CSS, RESULT_COLOR, RESULT_LABEL, fmt_s, fmt_time, render
 
 LOG = logging.getLogger("runtime_log.web")
+BLACKBOX_FILES = {"window.mcap", "trigger.json", "kernel.log"}
 RUN_FILES = {"report.html", "run.json", "events.jsonl", "resources.jsonl", "ethercat.jsonl", "launch.log.gz"}
 
 
@@ -110,6 +111,14 @@ class Handler(BaseHTTPRequestHandler):
                 self.end_headers()
                 return
             parts.append("report.html")
+        if len(parts) == 4 and parts[1] == "blackbox" and parts[3] in BLACKBOX_FILES and not parts[2].startswith(".") and "/" not in parts[2]:
+            target = run_dir / "blackbox" / parts[2] / parts[3]
+            if not target.is_file():
+                self._send(404, b"not found", "text/plain", head)
+                return
+            kinds = {"window.mcap": "application/octet-stream", "trigger.json": "application/json", "kernel.log": "text/plain; charset=utf-8"}
+            self._send(200, target.read_bytes(), kinds[parts[3]], head)
+            return
         name = parts[1]
         if len(parts) != 2 or name not in RUN_FILES:
             self._send(404, b"not found", "text/plain", head)

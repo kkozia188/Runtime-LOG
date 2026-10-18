@@ -122,7 +122,11 @@ def _controllers(events: list[Event], t0: float) -> list[dict]:
 def _anomalies(events: list[Event], shutdown_ts: Optional[float]) -> dict:
     counts: Counter = Counter()
     for event in events:
-        if event.kind == ECAT and event.rule == "counter_increase":
+        if event.kind == "blackbox" and event.rule == "blackbox_saved":
+            counts["blackbox.saved"] += 1
+            for reason in event.data.get("reasons", []):
+                counts[f"blackbox.{reason}"] += 1
+        elif event.kind == ECAT and event.rule == "counter_increase":
             for key in ("lost_frames", "tx_errors"):
                 if event.data.get(key):
                     counts[f"ecat.{key}"] += int(event.data[key])

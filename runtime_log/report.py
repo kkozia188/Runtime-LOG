@@ -157,6 +157,7 @@ def gantt(summary: dict, events: list[Event], ecat_rows: list[dict], t0: float, 
     markers("启动步骤", [e for e in events if e.kind == STAGE], lambda e: "#0969da")
     markers("失败/停止", [e for e in events if e.kind in (FAILURE, SHUTDOWN, SIGNAL)], lambda e: "#cf222e" if e.kind == FAILURE else "#9a6700")
     markers("控制事件", [e for e in events if e.kind == CONTROL], lambda e: "#8250df")
+    markers("黑匣子", [e for e in events if e.rule in ("blackbox_saved", "blackbox_expected")], lambda e: "#cf222e" if e.rule == "blackbox_saved" else "#8c959f")
     markers("EtherCAT 内核", [e for e in events if e.kind == ECAT and e.source == "kernel"], lambda e: {"error": "#cf222e", "warn": "#bf8700"}.get(e.level, "#57606a"))
 
     # slave AL states from polling
@@ -239,6 +240,35 @@ def counters_table(ecat_rows: list[dict]) -> str:
     )
     note = f'<p class="k">轮询失败 {len(errors)} 次（例如主站释放后）。</p>' if errors else ""
     return f'<table><tr><th>计数</th><th>首次采样</th><th>末次采样</th><th>本次运行增量</th></tr>{cells}</table>{note}<p class="k">采样 {len(rows)} 次，{rows[0]["t"]:.1f}–{rows[-1]["t"]:.1f} s。</p>'
+
+
+def blackbox_section(run: dict, events: list[Event], t0: float) -> str:
+    boxes = run.get("blackbox") or []
+    if not boxes:
+        return '<p class="k">本次运行没有 1 kHz 记录控制器（未加载 runtime_log_recorder）。</p>'
+    rows = []
+    for box in boxes:
+        stats = box.get("cycle_stats") or {}
+        nominal = stats.get("nominal_period_ns")
+        rows.append(
+            f'<tr><td class="mono">{esc(box.get("segment"))}</td><td class="num">{box.get("fields")}</td><td class="num">{stats.get("cycles", 0)}</td>'
+            f'<td class="num">{(nominal or 0) / 1e3:.1f}</td><td class="num">{(stats.get("mean_period_ns") or 0) / 1e3:.3f}</td>'
+            f'<td class="num">{(stats.get("min_period_ns") or 0) / 1e3:.1f} / {(stats.get("max_period_ns") or 0) / 1e3:.1f}</td>'
+            f'<td class="num">{stats.get("overruns", 0)}</td><td class="num">{box.get("gaps", 0)}</td>'
+            f'<td class="num">{len(box.get("saved") or [])}</td><td class="num">{len(box.get("expected_transitions") or [])}</td></tr>'
+        )
+    saved = [e for e in events if e.rule == "blackbox_saved"]
+    saved_rows = "".join(
+        f'<tr class="hit"><td class="num">{e.ts - t0:.3f}</td><td>{esc(", ".join(e.data.get("reasons", [])))}</td><td class="mono">{esc(e.message[:200])}</td>'
+        f'<td><a href="blackbox/{esc(e.data.get("dir"))}/window.mcap">window.mcap</a> · <a href="blackbox/{esc(e.data.get("dir"))}/trigger.json">trigger.json</a>'
+        f' · <a href="blackbox/{esc(e.data.get("dir"))}/kernel.log">kernel.log</a></td></tr>'
+        for e in saved
+    )
+    return (
+        '<table><tr><th>共享内存段</th><th>字段</th><th>周期数</th><th>名义周期 µs</th><th>平均 µs</th><th>最小 / 最大 µs</th>'
+        '<th>超时（&gt;1.5 倍）</th><th>读者缺口</th><th>已存窗口</th><th>预期内切换</th></tr>' + "".join(rows) + "</table>"
+        + (f'<br><table><tr><th>t (s)</th><th>触发原因</th><th>详情</th><th>文件（前 10 s、后 2 s）</th></tr>{saved_rows}</table>' if saved_rows else '<p class="k">没有触发。</p>')
+    )
 
 
 def render(run: dict, events: list[Event], run_dir: Optional[Path] = None) -> str:
@@ -329,6 +359,7 @@ def render(run: dict, events: list[Event], run_dir: Optional[Path] = None) -> st
 {failure_html}
 <div class="card grid">{facts_html}</div>
 <h2>异常计数</h2><table style="max-width:520px"><tr><th>项目</th><th>次数</th></tr>{anomaly_rows}</table>
+<h2>1 kHz 黑匣子</h2>{blackbox_section(run, events, t0)}
 {zoom}<h2>时间线（全程）</h2>{gantt(summary, events, ecat_rows, t0, t_max)}
 <h2>启动步骤</h2><table><tr><th>t (s)</th><th>步骤</th><th>原文</th></tr>{stage_rows or '<tr><td colspan="3">无</td></tr>'}</table>
 <h2>资源</h2>{line_chart(cpu, t_max, "%", "进程 CPU（%，单核 = 100）")}{line_chart(rss, t_max, " MiB", "进程常驻内存（MiB）")}{line_chart(threads, t_max, "%", "ros2_control_node 线程 CPU（前 8）")}

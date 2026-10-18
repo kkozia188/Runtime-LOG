@@ -221,6 +221,37 @@ def test_service_restart_reuses_the_run_and_keeps_polled_events(tmp_path, profil
     assert second.counters.high["tx_frames"] == 108821609
 
 
+def test_recorder_attaches_the_control_process_segment_and_reports_blackbox_events(tmp_path, profile, artifact_dir):
+    pytest.importorskip("mcap")
+    from test_blackbox import FIELDS, PyWriter, run_cycles
+
+    shm = tmp_path / "shm"
+    shm.mkdir()
+    log_dir = tmp_path / f"x-{LAUNCH_PID}"
+    log_dir.mkdir()
+    (log_dir / "launch.log").write_text((FIXTURES / "launch_normal.log").read_text().split("Stopping")[0])
+    writer = PyWriter(shm / f"runtime-log.{CONTROL_PID}.runtime_log_recorder", FIELDS)
+    PyWriter(shm / "runtime-log.999999.other_stack", FIELDS)  # another process: must be ignored
+    recorder = RunRecorder(LAUNCH_PID, log_dir, profile, Archive(tmp_path / "runs"), FakeProc(artifact_dir), None,
+                           shm_dir=shm, blackbox_settings=__import__("runtime_log.blackbox", fromlist=["Settings"]).Settings(pre_s=1, post_s=0.2, stall_s=3600))
+    recorder.tick(recorder.start + 1)
+    assert list(recorder.blackboxes) == [f"runtime-log.{CONTROL_PID}.runtime_log_recorder"]
+    run_cycles(writer, 1500)
+    run_cycles(writer, 400, sw=0x0218)
+    box = recorder.blackboxes[f"runtime-log.{CONTROL_PID}.runtime_log_recorder"]
+    box.stop()
+    box.join(10)
+    recorder.tick(recorder.start + 2)
+    saved = [e for e in recorder.events if e.rule == "blackbox_saved"]
+    assert saved and "drive_fault" in saved[0].data["reasons"]
+    document = recorder.finish(recorder.start + 3)
+    assert document["summary"]["anomalies"]["blackbox.drive_fault"] == 1
+    assert document["blackbox"][0]["cycle_stats"]["cycles"] == 1900
+    assert (shm / f"runtime-log.{CONTROL_PID}.runtime_log_recorder").exists()  # writer (this pid) still alive
+    page = render(document, recorder.events, recorder.dir)
+    assert "1 kHz 黑匣子" in page and "window.mcap" in page
+
+
 def test_counter_events_from_archived_rows_ignore_in_flight_dips():
     from runtime_log.recorder import counter_events
 

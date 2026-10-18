@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import gzip
 import json
+import queue
 import shutil
 import time
 from pathlib import Path
@@ -18,9 +19,12 @@ from .archive import RUN_FILE, Archive, read_json, run_id, write_json
 from .ethercat import CounterTracker, EthercatPoller
 from .launchlog import parse_line
 from .meta import artifact_info, git_info, hardware_kind, host_info, launch_args, params_files, ros_overrides, thread_layout
-from .model import PROCESS_STARTED, Event
+from .model import PROCESS_STARTED, SHUTDOWN, SIGNAL, Event
+from .blackbox import BlackBox
+from .blackbox import Settings as BlackBoxSettings
 from .procfs import CpuSampler, ProcFS
 from .profile import Profile
+from .shm import SHM_DIR
 
 
 class JsonlWriter:
@@ -72,8 +76,15 @@ class RunRecorder:
         ethercat_hz: Optional[tuple[float, float]] = None,
         proc_hz: float = 1.0,
         clock=time.time,
+        shm_dir: Path = SHM_DIR,
+        blackbox_settings: Optional[BlackBoxSettings] = None,
     ):
         self.launch_pid = launch_pid
+        self.shm_dir = shm_dir
+        self.blackbox_settings = blackbox_settings
+        self.blackboxes: dict[str, BlackBox] = {}
+        self.blackbox_events: "queue.Queue[dict]" = queue.Queue()
+        self.next_attach = 0.0
         self.log_dir = log_dir
         self.profile = profile
         self.archive = archive
@@ -224,6 +235,77 @@ class RunRecorder:
             if event.ts >= self.start - 1.0 and (self.ended is None or event.ts <= self.ended + 3.0):
                 self.kernel_seen.add(key)
                 self._emit(event)
+                if event.level == "error":
+                    for box in self.blackboxes.values():
+                        box.trigger("kernel_error", event.ts, event.message[:200])
+
+    # ------------------------------------------------------------------ black box
+    def attach_segments(self) -> None:
+        """Start a black box for every recorder segment written by this run's control process."""
+        if self.control_pid is None or self.ended is not None:
+            return
+        try:
+            candidates = [p for p in self.shm_dir.iterdir() if p.name.startswith(f"runtime-log.{self.control_pid}.")]
+        except FileNotFoundError:
+            return
+        for path in candidates:
+            if path.name in self.blackboxes:
+                continue
+            try:
+                box = BlackBox(path, self.dir / "blackbox", self.blackbox_settings, explain=self._explain,
+                               kernel_lines=self._kernel_lines, on_event=self.blackbox_events.put)
+            except (OSError, ValueError) as error:
+                self.blackboxes[path.name] = None  # type: ignore[assignment]  # unreadable: do not retry
+                self._emit(Event(self.clock(), "blackbox", "runtime-log", path.name, f"segment unreadable: {error}", "warn", rule="segment_unreadable", label="共享内存段不可读"))
+                continue
+            self.blackboxes[path.name] = box
+            box.start()
+            self._emit(Event(self.clock(), "blackbox", "runtime-log", path.name,
+                             f"{box.reader.writer_name}: {len(box.reader.fields)} fields", "info", rule="segment_attached", label="黑匣子开始记录"))
+
+    def _active_boxes(self) -> list[BlackBox]:
+        return [box for box in self.blackboxes.values() if box is not None]
+
+    def _explain(self, start: float, end: float) -> Optional[str]:
+        """Why a state change in [start, end] is expected: a disable request or the stop sequence."""
+        shutdown = next((e.ts for e in list(self.events) if e.kind in (SHUTDOWN, SIGNAL)), None)
+        if shutdown is not None and end >= shutdown - 1.0:
+            return "shutdown"
+        if self.ended is not None and end >= self.ended - 3.0:
+            return "run ended"
+        for event in list(self.events):
+            if event.rule == "rt_disable" and start <= event.ts <= end:
+                return "/rt/disable"
+        return None
+
+    def _kernel_lines(self, start: float, end: float) -> list[str]:
+        return [
+            f"{time.strftime('%H:%M:%S', time.localtime(e.ts))}.{int((e.ts % 1) * 1e6):06d} {e.message}"
+            for e in list(self.events)
+            if e.source == "kernel" and start - 1.0 <= e.ts <= end + 1.0
+        ]
+
+    def drain_blackbox_events(self) -> None:
+        while True:
+            try:
+                item = self.blackbox_events.get_nowait()
+            except queue.Empty:
+                return
+            if item["kind"] == "blackbox_saved":
+                self._emit(Event(item["ts"], "blackbox", "runtime-log", item["dir"], item.get("detail", ""), "error",
+                                 rule="blackbox_saved", label="黑匣子触发：" + ", ".join(item["reasons"]), data={"reasons": item["reasons"], "dir": item["dir"]}))
+            else:
+                self._emit(Event(item["ts"], "blackbox", "runtime-log", "", ", ".join(item["reasons"]), "info",
+                                 rule="blackbox_expected", label="预期内的状态切换（" + item["explained_by"] + "）",
+                                 data={"reasons": item["reasons"], "explained_by": item["explained_by"]}))
+
+    def manual_trigger(self, reason: str) -> int:
+        for box in self._active_boxes():
+            box.trigger("manual", None, reason)
+        return len(self._active_boxes())
+
+    def _blackbox_summary(self) -> list[dict]:
+        return [box.describe() for box in self._active_boxes()]
 
     def sample_processes(self, now: float) -> None:
         tree = self.proc.descendants(self.launch_pid)
@@ -330,15 +412,33 @@ class RunRecorder:
         if period and now >= self.next_ecat:
             self.poll_ethercat(now)
             self.next_ecat = now + period
+        if now >= self.next_attach:
+            self.attach_segments()
+            self.next_attach = now + 1.0
+        self.drain_blackbox_events()
         if now >= self.next_flush:
             self.flush(now)
             self.next_flush = now + 5.0
+
+    def _summarize(self, **kwargs) -> dict:
+        summary = timeline.summarize(self.events, self.profile.ready_stages, **kwargs)
+        blackbox = self._blackbox_summary()
+        overruns = sum((box["cycle_stats"].get("overruns") or 0) for box in blackbox)
+        gaps = sum(box["gaps"] for box in blackbox)
+        if overruns:
+            summary["anomalies"]["cycle.overruns"] = overruns
+        if gaps:
+            summary["anomalies"]["blackbox.reader_gaps"] = gaps
+        summary["anomalies"] = dict(sorted(summary["anomalies"].items()))
+        summary["anomaly_total"] = sum(summary["anomalies"].values())
+        self.document["blackbox"] = blackbox
+        return summary
 
     def flush(self, now: float) -> None:
         for writer in (self.events_out, self.resources_out, self.ecat_out):
             if writer is not None:
                 writer.flush()
-        self.document["summary"] = timeline.summarize(self.events, self.profile.ready_stages, running=True, end_ts=now)
+        self.document["summary"] = self._summarize(running=True, end_ts=now)
         self.document["resources"] = self._resource_summary()
         write_json(self.dir / RUN_FILE, self.document)
 
@@ -357,12 +457,23 @@ class RunRecorder:
 
     def finish(self, now: Optional[float] = None, interrupted: bool = False) -> dict:
         self.stop(now)
+        boxes = self._active_boxes()
+        for box in boxes:
+            box.stop()
+        for box in boxes:
+            box.join(timeout=15.0)
+        self.drain_blackbox_events()
+        for box in boxes:
+            # A finished writer's segment is no longer needed once read; a live one (service restart) stays.
+            if not box.reader.writer_alive():
+                box.reader.close()
+                box.path.unlink(missing_ok=True)
         if self.tail.partial:
             line = parse_line(self.tail.partial.decode("utf-8", "replace"))
             if line is not None:
                 for event in self.profile.classify(line):
                     self._emit(event)
-        summary = timeline.summarize(self.events, self.profile.ready_stages, running=interrupted, end_ts=None if not interrupted else self.ended)
+        summary = self._summarize(running=interrupted, end_ts=None if not interrupted else self.ended)
         result = "interrupted" if interrupted and summary["result"] == "running" else summary["result"]
         summary["result"] = result
         self.document.update(

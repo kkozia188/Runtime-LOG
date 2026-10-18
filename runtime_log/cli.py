@@ -57,6 +57,9 @@ def main(argv=None) -> int:
     report = commands.add_parser("report", help="rewrite report.html of a run")
     report.add_argument("run")
 
+    trig = commands.add_parser("trigger", help="save a black-box window now (all running recorders)")
+    trig.add_argument("reason", nargs="?", default="manual")
+
     commands.add_parser("gc", help="apply retention and the disk-space guard now")
     commands.add_parser("list", help="print the run index")
 
@@ -104,6 +107,16 @@ def main(argv=None) -> int:
     if args.command == "report":
         run_dir = resolve_run(archive, args.run)
         print(write_report(run_dir, *load_run(run_dir)))
+        return 0
+
+    if args.command == "trigger":
+        import time as _time
+
+        control = archive.root.parent / "control"
+        control.mkdir(parents=True, exist_ok=True)
+        path = control / f"trigger-{_time.time():.3f}"
+        path.write_text(args.reason, encoding="utf-8")
+        print(f"requested: {path} (the service picks it up within 1 s)")
         return 0
 
     if args.command == "gc":

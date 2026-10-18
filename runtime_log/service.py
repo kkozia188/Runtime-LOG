@@ -204,9 +204,25 @@ class Service:
         LOG.info("run %s started (launch pid %s, log %s)", recorder.id, pid, log_dir)
         self.archive.update_index()
 
+    def manual_triggers(self) -> None:
+        """`runtime-log trigger` drops files into <archive>/../control; each one triggers every black box."""
+        control = self.archive.root.parent / "control"
+        try:
+            files = sorted(control.glob("trigger-*"))
+        except OSError:
+            return
+        for path in files:
+            try:
+                reason = path.read_text(encoding="utf-8", errors="replace").strip()[:200] or "manual"
+            finally:
+                path.unlink(missing_ok=True)
+            count = sum(recorder.manual_trigger(reason) for recorder in self.recorders.values())
+            LOG.info("manual trigger '%s' sent to %d black boxes", reason, count)
+
     def step(self, now: float, discover: bool) -> None:
         kernel_events = self.kernel.read()
         if discover:
+            self.manual_triggers()
             for pid in self.discovery.scan():
                 if pid not in self.recorders and pid not in self.draining and self.pending.get(pid) != float("inf"):
                     self._start_run(pid, now)
