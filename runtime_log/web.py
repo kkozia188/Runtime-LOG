@@ -10,9 +10,10 @@ import threading
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
-from urllib.parse import unquote, urlparse
+from urllib.parse import parse_qs, unquote, urlparse
 
 from .archive import INDEX, RUN_FILE, Archive, read_json
+from .compare import render_compare
 from .recorder import load_run
 from .report import CSS, RESULT_COLOR, RESULT_LABEL, fmt_s, fmt_time, render
 
@@ -41,6 +42,7 @@ def render_index(index: dict) -> str:
             detail = esc(detail)
         rows.append(
             f'<tr data-result="{esc(result)}" data-hw="{esc(run.get("hardware"))}">'
+            f'<td><input type="checkbox" class="pick" value="{esc(run["id"])}"></td>'
             f'<td class="mono">{esc(fmt_time(run.get("start")))}</td>'
             f'<td><a href="{esc(run["id"])}/">{esc(run["id"])}</a></td>'
             f'<td>{esc(run.get("scope"))}</td><td class="num">{esc(run.get("domain"))}</td><td>{esc(run.get("hardware"))}</td>'
@@ -61,13 +63,16 @@ def render_index(index: dict) -> str:
 <div class="filters"><label>结果 <select id="fResult"><option value="">全部</option><option value="failed">失败</option><option value="ok">正常结束</option><option value="running">运行中</option><option value="aborted">未正常结束</option><option value="interrupted">记录中断</option></select></label>
 <label>硬件 <select id="fHw"><option value="">全部</option><option>ethercat</option><option>mock</option></select></label>
 <label><input id="fAnomaly" type="checkbox"> 只看有异常</label><label>搜索 <input id="fText" size="24"></label></div>
-<table id="runs"><tr><th>开始</th><th>运行</th><th>scope</th><th>域</th><th>硬件</th><th>结果</th><th>时长</th><th>就绪</th><th>失败步骤</th><th>最后成功步骤</th><th>异常</th><th>主要异常</th><th>峰值 CPU%</th><th>来源</th></tr>
-{"".join(rows) or '<tr><td colspan="14">还没有运行记录</td></tr>'}</table></main>
+<p><button id="compareBtn" disabled>对比所选两次运行</button> <span class="k">勾选两行后对比（先选的为 A）</span></p>
+<table id="runs"><tr><th></th><th>开始</th><th>运行</th><th>scope</th><th>域</th><th>硬件</th><th>结果</th><th>时长</th><th>就绪</th><th>失败步骤</th><th>最后成功步骤</th><th>异常</th><th>主要异常</th><th>峰值 CPU%</th><th>来源</th></tr>
+{"".join(rows) or '<tr><td colspan="15">还没有运行记录</td></tr>'}</table></main>
 <script>
 const rows=[...document.querySelectorAll('#runs tr[data-result]')];
 function apply(){{const r=fResult.value,h=fHw.value,a=fAnomaly.checked,t=fText.value.toLowerCase();
-rows.forEach(x=>{{const ok=(!r||x.dataset.result===r)&&(!h||x.dataset.hw===h)&&(!a||x.cells[10].textContent.trim())&&(!t||x.textContent.toLowerCase().includes(t));x.style.display=ok?'':'none'}})}}
+rows.forEach(x=>{{const ok=(!r||x.dataset.result===r)&&(!h||x.dataset.hw===h)&&(!a||x.cells[11].textContent.trim())&&(!t||x.textContent.toLowerCase().includes(t));x.style.display=ok?'':'none'}})}}
 [fResult,fHw,fAnomaly,fText].forEach(e=>e.oninput=e.onchange=apply);
+const picked=[];document.querySelectorAll('.pick').forEach(c=>c.onchange=()=>{{const i=picked.indexOf(c.value);if(c.checked){{picked.push(c.value);while(picked.length>2){{const old=picked.shift();document.querySelector('.pick[value="'+old+'"]').checked=false}}}}else if(i>=0)picked.splice(i,1);compareBtn.disabled=picked.length!==2}});
+compareBtn.onclick=()=>{{location.href='/compare?a='+encodeURIComponent(picked[0])+'&b='+encodeURIComponent(picked[1])}};
 </script></body></html>"""
 
 
@@ -95,6 +100,16 @@ class Handler(BaseHTTPRequestHandler):
         if not parts:
             index = read_json(root / INDEX, {"runs": []})
             self._send(200, render_index(index).encode(), "text/html; charset=utf-8", head)
+            return
+        if parts == ["compare"]:
+            query = parse_qs(urlparse(self.path).query)
+            ids = [query.get(key, [""])[0] for key in ("a", "b")]
+            dirs = [root / run_id for run_id in ids]
+            if not all(run_id and "/" not in run_id and not run_id.startswith(".") and (d / RUN_FILE).is_file() for run_id, d in zip(ids, dirs)):
+                self._send(404, "选择两次已存在的运行".encode(), "text/plain; charset=utf-8", head)
+                return
+            (run_a, events_a), (run_b, events_b) = load_run(dirs[0]), load_run(dirs[1])
+            self._send(200, render_compare(run_a, events_a, run_b, events_b).encode(), "text/html; charset=utf-8", head)
             return
         if parts == ["index.json"]:
             self._send(200, (root / INDEX).read_bytes() if (root / INDEX).exists() else b"{}", "application/json", head)

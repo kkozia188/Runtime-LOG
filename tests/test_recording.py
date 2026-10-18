@@ -349,6 +349,31 @@ def test_import_reads_scope_and_hardware_from_the_artifact_named_in_the_log(tmp_
     assert document["id"].endswith("-d77-bench_left_arm")
 
 
+def test_compare_page_shows_stage_and_anomaly_differences(tmp_path, profile):
+    archive = Archive(tmp_path / "runs")
+    ids = []
+    for name, kernel, pid in (("launch_normal.log", "kernel_normal_start.jsonl", 235346), ("launch_handoff_rescan.log", "kernel_rescan.jsonl", 89236)):
+        log_dir = tmp_path / f"2026-10-18-00-00-00-1-ar-Default-string-{pid}"
+        log_dir.mkdir()
+        (log_dir / "launch.log").write_text((FIXTURES / name).read_text())
+        document = import_launch_dir(log_dir, profile, archive, scope="bench_left_arm", domain="77",
+                                     kernel_lines=(FIXTURES / kernel).read_text().splitlines())
+        ids.append(document["id"])
+    server = serve(archive, "127.0.0.1", 0)
+    base = f"http://127.0.0.1:{server.server_address[1]}"
+    try:
+        page = urllib.request.urlopen(f"{base}/compare?a={ids[0]}&b={ids[1]}").read().decode()
+        assert "两次运行对比" in page and "启动步骤" in page and "全部从站 OP" in page
+        assert "ecat.not_synced" in page  # only in the rescan run
+        index = urllib.request.urlopen(base + "/").read().decode()
+        assert 'class="pick"' in index and "compareBtn" in index
+        with pytest.raises(urllib.error.HTTPError) as error:
+            urllib.request.urlopen(f"{base}/compare?a={ids[0]}&b=../etc")
+        assert error.value.code == 404
+    finally:
+        server.shutdown()
+
+
 def test_web_is_read_only(tmp_path, profile):
     log_dir = tmp_path / "2026-10-17-19-04-36-1-ar-Default-string-96357"
     log_dir.mkdir()
