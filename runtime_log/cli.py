@@ -86,7 +86,7 @@ def main(argv=None) -> int:
             write_report(run_dir, *load_run(run_dir))
 
         if not args.no_web:
-            serve_web(archive, args.host, args.port)
+            serve_web(archive, args.host, args.port, profile.blackbox.get("enums", {}))
         Service(profile, archive, poller=poller, ethercat_hz=args.ethercat_hz, proc_hz=args.proc_hz, on_finish=on_finish).run_forever()
         return 0
 

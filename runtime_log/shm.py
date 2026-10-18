@@ -131,6 +131,22 @@ class ShmReader:
         self.next = stop + 1
         return RawBatch(slots, gaps, head)
 
+    def latest(self) -> Optional[tuple[int, int, int, tuple]]:
+        """(seq, time_ns, period_ns, values) of the newest committed cycle, without moving read()."""
+        for _ in range(3):
+            head = self.head()
+            if head == 0:
+                return None
+            offset = self.header_size + (head % self.slot_count) * self.slot_size
+            if U64.unpack_from(self.map, offset)[0] != head:
+                continue
+            raw = self.map[offset : offset + self.slot_size]
+            if U64.unpack_from(self.map, offset)[0] != head:
+                continue
+            _, time_ns, period_ns = SLOT_HEAD.unpack_from(raw, 0)
+            return head, time_ns, period_ns, self.values.unpack_from(raw, 24)
+        return None
+
     def close(self) -> None:
         self.map.close()
 

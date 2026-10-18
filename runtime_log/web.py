@@ -10,9 +10,11 @@ import threading
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
+from typing import Optional
 from urllib.parse import parse_qs, unquote, urlparse
 
 from .archive import INDEX, RUN_FILE, Archive, read_json
+from . import live
 from .compare import render_compare
 from .experiment_report import render_experiment, render_experiment_compare
 from .recorder import load_run
@@ -60,7 +62,7 @@ def render_index(index: dict) -> str:
     free_gb = (usage.get("disk_free_bytes") or 0) / 1024**3
     return f"""<!doctype html><html lang="zh-CN"><head><meta charset="utf-8">{refresh}<meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Runtime-LOG</title><style>{CSS}</style></head><body><main style="max-width:1600px">
-<h1>Runtime-LOG · 运行记录</h1>
+<h1>Runtime-LOG · 运行记录 <a href="/live" style="font-size:14px">实时状态 →</a></h1>
 <p class="k">共 {len(runs)} 次运行 · 归档 {archive_mb:.1f} MiB · 磁盘剩余 {free_gb:.1f} GiB · 保留 7 天 · 只读页面 · 更新于 {fmt_time(index.get("generated"))}</p>
 <div class="filters"><label>结果 <select id="fResult"><option value="">全部</option><option value="failed">失败</option><option value="ok">正常结束</option><option value="running">运行中</option><option value="aborted">未正常结束</option><option value="interrupted">记录中断</option></select></label>
 <label>硬件 <select id="fHw"><option value="">全部</option><option>ethercat</option><option>mock</option></select></label>
@@ -80,6 +82,7 @@ compareBtn.onclick=()=>{{location.href='/compare?a='+encodeURIComponent(picked[0
 
 class Handler(BaseHTTPRequestHandler):
     archive: Archive
+    enums: dict = {}
     server_version = "Runtime-LOG"
 
     def log_message(self, fmt, *args):  # keep journald quiet
@@ -112,6 +115,13 @@ class Handler(BaseHTTPRequestHandler):
                 return
             (run_a, events_a), (run_b, events_b) = load_run(dirs[0]), load_run(dirs[1])
             self._send(200, render_compare(run_a, events_a, run_b, events_b).encode(), "text/html; charset=utf-8", head)
+            return
+        if parts == ["live"]:
+            self._send(200, live.page().encode(), "text/html; charset=utf-8", head)
+            return
+        if parts == ["live.json"]:
+            body = json.dumps(live.snapshot(self.archive, self.enums), ensure_ascii=False).encode()
+            self._send(200, body, "application/json", head)
             return
         if parts == ["compare_experiments"]:
             query = parse_qs(urlparse(self.path).query)
@@ -209,8 +219,8 @@ class Handler(BaseHTTPRequestHandler):
     do_POST = do_PUT = do_DELETE = do_PATCH = _refuse
 
 
-def serve(archive: Archive, host: str, port: int) -> ThreadingHTTPServer:
-    handler = type("BoundHandler", (Handler,), {"archive": archive})
+def serve(archive: Archive, host: str, port: int, enums: Optional[dict] = None) -> ThreadingHTTPServer:
+    handler = type("BoundHandler", (Handler,), {"archive": archive, "enums": enums or {}})
     server = ThreadingHTTPServer((host, port), handler)
     server.daemon_threads = True
     thread = threading.Thread(target=server.serve_forever, name="runtime-log-web", daemon=True)
