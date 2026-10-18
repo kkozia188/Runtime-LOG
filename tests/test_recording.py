@@ -247,6 +247,20 @@ def test_import_and_replay_of_a_failed_run(tmp_path, profile):
     assert row["failed_stage"] == "hardware_activation" and row["anomalies"]["ecat.responding"] >= 1
 
 
+def test_import_reads_scope_and_hardware_from_the_artifact_named_in_the_log(tmp_path, profile, artifact_dir):
+    log_dir = tmp_path / "2026-10-18-21-03-00-1-ar-Default-string-273117"
+    log_dir.mkdir()
+    (log_dir / "launch.log").write_text(
+        "1792328580.6 [INFO] [launch]: All log files can be found below /x\n"
+        f"1792328581.0 [ERROR] [launch]: Caught exception in launch (see debug for traceback): Artifact is stale; "
+        f"regenerate with: ros2 run rt_control_composer compose_artifact --output {artifact_dir} --real\n"
+    )
+    document = import_launch_dir(log_dir, profile, Archive(tmp_path / "runs"), domain="77", kernel_lines=[])
+    assert document["scope"] == "bench_left_arm" and document["hardware"] == "ethercat"
+    assert document["summary"]["failed_stage"] == "preflight"
+    assert document["id"].endswith("-d77-bench_left_arm")
+
+
 def test_web_is_read_only(tmp_path, profile):
     log_dir = tmp_path / "2026-10-17-19-04-36-1-ar-Default-string-96357"
     log_dir.mkdir()

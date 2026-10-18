@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import gzip
 import json
+import re
 import shutil
 from pathlib import Path
 from typing import Iterable, Optional
@@ -11,7 +12,7 @@ from typing import Iterable, Optional
 from . import kernlog, timeline
 from .archive import RUN_FILE, Archive, read_json, run_id, write_json
 from .launchlog import read_lines
-from .meta import host_info
+from .meta import artifact_info, hardware_kind, host_info
 from .model import Event
 from .procfs import ProcFS
 from .profile import Profile
@@ -26,6 +27,24 @@ def _events_file(run_dir: Path, events: list[Event], t0: float) -> None:
         for event in timeline.sort_events(events):
             stream.write(json.dumps(event.to_dict(t0), ensure_ascii=False, separators=(",", ":")) + "\n")
     temporary.replace(run_dir / "events.jsonl")
+
+
+PATH_TOKEN = re.compile(r"/[\w.@+-]+(?:/[\w.@+-]+)+")
+
+
+def find_artifact_dir(lines: Iterable[str]) -> Optional[Path]:
+    """First existing deployment artifact directory mentioned in the log (contains artifact.yaml)."""
+    seen = set()
+    for line in lines:
+        for token in PATH_TOKEN.findall(line):
+            path = Path(token)
+            for candidate in (path, *list(path.parents)[:3]):
+                if candidate in seen or str(candidate) in ("/", "/home", "/tmp"):
+                    continue
+                seen.add(candidate)
+                if (candidate / "artifact.yaml").is_file():
+                    return candidate
+    return None
 
 
 def import_launch_dir(
@@ -53,6 +72,16 @@ def import_launch_dir(
         kernel = kernel_events(kernel_lines, start - 1.0, end + 3.0)
     events += kernel
     summary = timeline.summarize(events, profile.ready_stages)
+    artifact: dict = {}
+    artifact_dir = find_artifact_dir(text)
+    if artifact_dir is not None:
+        artifact = artifact_info(artifact_dir)
+        artifact["note"] = "导入时读取的是产物目录的当前内容，可能晚于这次运行"
+        selection = artifact.get("selection") or {}
+        scope = scope or selection.get("control_scope", "")
+        if not hardware:
+            mock, uses_ethercat = hardware_kind(artifact, profile.run, {})
+            hardware = "mock" if mock else ("ethercat" if uses_ethercat else "other")
     identifier = archive.find_run(ros_log_dir=str(log_dir)) or archive.unique_id(run_id(start, domain, scope or "import"))
     run_dir = archive.run_dir(identifier)
     pid = log_dir.name.rsplit("-", 1)[-1]
@@ -72,6 +101,7 @@ def import_launch_dir(
         "result": summary["result"],
         "summary": summary,
         "resources": {},
+        "artifact": artifact,
         "note": "离线导入：只有日志与内核事件，没有资源与主站轮询数据。",
     }
     _events_file(run_dir, events, summary["t0"])
