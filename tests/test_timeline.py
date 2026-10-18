@@ -54,6 +54,20 @@ def test_handoff_rescan_run_is_ok_but_counts_bus_anomalies(fixture_text, profile
     assert summary["anomaly_total"] > 0
 
 
+def test_optional_recorder_spawner_failure_is_an_anomaly_not_a_failed_run(fixture_text, profile):
+    lines = fixture_text("launch_normal.log").splitlines()
+    cut = next(i for i, line in enumerate(lines) if "Stopping" in line)
+    extra = [
+        "1792306075.0 [INFO] [runtime_log_recorder_spawner-7]: process started with pid [235500]",
+        "1792306076.0 [ERROR] [runtime_log_recorder_spawner-7]: process has died [pid 235500, exit code 1, cmd 'spawner runtime_log_recorder']",
+    ]
+    events = launch_events(lines[:cut] + extra + lines[cut:], profile)
+    summary = summarize(events, profile.ready_stages, optional_processes=profile.run["optional_processes"])
+    assert summary["result"] == "ok"
+    assert summary["anomalies"]["process.optional_failed.runtime_log_recorder_spawner"] == 1
+    assert summarize(events, profile.ready_stages)["result"] == "failed"  # without the exemption
+
+
 def test_failure_rules_win_over_stage_rules(profile):
     from runtime_log.launchlog import parse_line
 

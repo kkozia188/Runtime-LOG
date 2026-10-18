@@ -13,7 +13,9 @@ def sort_events(events: Iterable[Event]) -> list[Event]:
     return sorted(events, key=lambda e: (e.ts, e.source != "launch"))
 
 
-def summarize(events: list[Event], ready_stages: Iterable[str] = (), running: bool = False, end_ts: Optional[float] = None) -> dict:
+def summarize(events: list[Event], ready_stages: Iterable[str] = (), running: bool = False, end_ts: Optional[float] = None,
+              optional_processes: Iterable[str] = ()) -> dict:
+    optional = set(optional_processes)
     events = sort_events(events)
     launch_events = [e for e in events if e.source == "launch"]
     t0 = launch_events[0].ts if launch_events else (events[0].ts if events else 0.0)
@@ -30,6 +32,7 @@ def summarize(events: list[Event], ready_stages: Iterable[str] = (), running: bo
                 for e in events
                 if e.kind == PROCESS_EXITED
                 and e.data.get("exit_code", 0) != 0
+                and e.data.get("base") not in optional
                 and (shutdown_ts is None or e.ts < shutdown_ts)
             ),
             None,
@@ -56,7 +59,7 @@ def summarize(events: list[Event], ready_stages: Iterable[str] = (), running: bo
         result, failed_stage = "aborted", ""
 
     processes = _processes(events, end)
-    anomalies = _anomalies(events, shutdown_ts)
+    anomalies = _anomalies(events, shutdown_ts, optional)
     phases = {
         "startup": [0.0, round((ready_ts or stage_cut) - t0, 3)],
         "running": [round(ready_ts - t0, 3), round((shutdown_ts or end) - t0, 3)] if ready_ts else None,
@@ -119,7 +122,7 @@ def _controllers(events: list[Event], t0: float) -> list[dict]:
     return rows
 
 
-def _anomalies(events: list[Event], shutdown_ts: Optional[float]) -> dict:
+def _anomalies(events: list[Event], shutdown_ts: Optional[float], optional: set = frozenset()) -> dict:
     counts: Counter = Counter()
     for event in events:
         if event.kind == "blackbox" and event.rule == "blackbox_saved":
@@ -139,6 +142,8 @@ def _anomalies(events: list[Event], shutdown_ts: Optional[float]) -> dict:
             counts["log.error_lines"] += 1
         elif event.kind == FAILURE:
             counts["log.failures"] += 1
+        elif event.kind == PROCESS_EXITED and event.data.get("exit_code", 0) != 0 and event.data.get("base") in optional:
+            counts[f"process.optional_failed.{event.data.get('base')}"] += 1
         elif event.kind == PROCESS_EXITED and event.data.get("exit_code", 0) != 0:
             key = "process.died_before_shutdown" if shutdown_ts is None or event.ts < shutdown_ts else "process.nonzero_exit_during_shutdown"
             counts[key] += 1

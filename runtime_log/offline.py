@@ -71,7 +71,7 @@ def import_launch_dir(
     else:
         kernel = kernel_events(kernel_lines, start - 1.0, end + 3.0)
     events += kernel
-    summary = timeline.summarize(events, profile.ready_stages)
+    summary = timeline.summarize(events, profile.ready_stages, optional_processes=profile.run.get("optional_processes", []))
     artifact: dict = {}
     artifact_dir = find_artifact_dir(text)
     if artifact_dir is not None:
@@ -134,7 +134,7 @@ def replay(run_dir: Path, profile: Profile) -> tuple[dict, list[Event]]:
     else:
         events = stored
     running = document.get("result") == "running"
-    summary = timeline.summarize(events, profile.ready_stages, running=running)
+    summary = timeline.summarize(events, profile.ready_stages, running=running, optional_processes=profile.run.get("optional_processes", []))
     if document.get("result") == "interrupted" and summary["result"] in ("aborted", "running"):
         summary["result"] = "interrupted"
     document["summary"] = summary

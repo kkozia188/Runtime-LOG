@@ -7,6 +7,9 @@ run:
   # Which `ros2 launch` processes start a run (regex over the space-joined command line).
   launch_match: 'ros2 launch rt_control_bringup \S+\.launch\.py'
   artifact_arg: generated_dir
+  # Processes whose non-zero exit is an anomaly, not a failed run (the optional recorder spawner).
+  optional_processes:
+    - runtime_log_recorder_spawner
   # Launch arguments read from the launch process command line.
   scope_arg: control_scope
   mock_arg: use_mock_hardware   # "false" = real hardware; the scope runtime defaults to mock
@@ -127,6 +130,13 @@ shutdown:
     match: 'Shutdown request received'
 
 controls:
+  - id: recorder_configured
+    label: 记录控制器已配置
+    match: 'RUNTIME_LOG_RECORDER_CONFIGURED segment=(?P<segment>\S+) fields=(?P<fields>\d+)'
+  - id: recorder_disabled
+    label: 记录控制器未记录（共享内存不可用）
+    level: warn
+    match: 'RUNTIME_LOG_RECORDER_DISABLED'
   - id: rt_enable
     label: 使能
     match: '/rt/enable accepted'

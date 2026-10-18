@@ -423,7 +423,7 @@ class RunRecorder:
             self.next_flush = now + 5.0
 
     def _summarize(self, **kwargs) -> dict:
-        summary = timeline.summarize(self.events, self.profile.ready_stages, **kwargs)
+        summary = timeline.summarize(self.events, self.profile.ready_stages, optional_processes=self.profile.run.get("optional_processes", []), **kwargs)
         blackbox = self._blackbox_summary()
         overruns = sum((box["cycle_stats"].get("overruns") or 0) for box in blackbox)
         gaps = sum(box["gaps"] for box in blackbox)
