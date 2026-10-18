@@ -242,6 +242,22 @@ def counters_table(ecat_rows: list[dict]) -> str:
     return f'<table><tr><th>计数</th><th>首次采样</th><th>末次采样</th><th>本次运行增量</th></tr>{cells}</table>{note}<p class="k">采样 {len(rows)} 次，{rows[0]["t"]:.1f}–{rows[-1]["t"]:.1f} s。</p>'
 
 
+def post_stop_section(run: dict) -> str:
+    result = run.get("post_stop")
+    if not result:
+        return '<p class="k">未读取（仿真硬件、记录中断或未启用）。</p>'
+    if result.get("skipped"):
+        return f'<p class="k">未读取：{esc(result["skipped"])}</p>'
+    rows = "".join(
+        f'<tr class="{"hit" if d.get("fault") else ("warn" if d.get("error_code") else "")}"><td class="num">{d["position"]}</td><td>{esc(d["name"])}</td><td>{esc(d.get("al_state"))}</td>'
+        f'<td class="mono">{esc(d.get("error_code_hex") or d.get("error_code_error", "-"))}</td><td>{esc(d.get("error_text", ""))}</td>'
+        f'<td class="mono">{esc(d.get("status_word_hex") or d.get("status_word_error", "-"))}</td><td>{"是" if d.get("fault") else ""}</td></tr>'
+        for d in result.get("drives", [])
+    )
+    return (f'<p class="k">读取时主站 {esc(result.get("master_phase"))}，{fmt_time(result.get("time"))}。</p>'
+            f'<table><tr><th>位置</th><th>从站</th><th>AL</th><th>0x603F</th><th>含义</th><th>0x6041</th><th>Fault</th></tr>{rows}</table>')
+
+
 def blackbox_section(run: dict, events: list[Event], t0: float) -> str:
     boxes = run.get("blackbox") or []
     if not boxes:
@@ -360,6 +376,7 @@ def render(run: dict, events: list[Event], run_dir: Optional[Path] = None) -> st
 <div class="card grid">{facts_html}</div>
 <h2>异常计数</h2><table style="max-width:520px"><tr><th>项目</th><th>次数</th></tr>{anomaly_rows}</table>
 <h2>1 kHz 黑匣子</h2>{blackbox_section(run, events, t0)}
+<h2>停后驱动错误码</h2>{post_stop_section(run)}
 {zoom}<h2>时间线（全程）</h2>{gantt(summary, events, ecat_rows, t0, t_max)}
 <h2>启动步骤</h2><table><tr><th>t (s)</th><th>步骤</th><th>原文</th></tr>{stage_rows or '<tr><td colspan="3">无</td></tr>'}</table>
 <h2>资源</h2>{line_chart(cpu, t_max, "%", "进程 CPU（%，单核 = 100）")}{line_chart(rss, t_max, " MiB", "进程常驻内存（MiB）")}{line_chart(threads, t_max, "%", "ros2_control_node 线程 CPU（前 8）")}

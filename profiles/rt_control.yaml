@@ -25,6 +25,15 @@ ethercat:
   startup_poll_hz: 5      # until the ready stage (+5 s), then steady
   steady_poll_hz: 1
   settle_s: 5
+  # After a run (master no longer in Operation): one SDO read of 0x603F / 0x6041 per drive.
+  post_stop:
+    enabled: true
+    drive_name_regex: 'ZeroErr|Kinco|Driver'
+    # Codes expected after an orderly stop on this bench: counted as reference only.
+    expected_codes: [0xA000, 0x730F]
+    error_codes:
+      0xA000: 主站掉线或退出 OP（零差手册 7.2.27；台架已列为启动可复位码）
+      0x730F: 台架 J3 已声明的编码器电池码（启动预检放行）
 
 # Stages in startup order. "controller" groups are reported in the controller table.
 stages:

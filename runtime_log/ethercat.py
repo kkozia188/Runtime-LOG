@@ -11,6 +11,8 @@ import subprocess
 from typing import Callable, Optional
 
 ALLOWED = frozenset({"master", "slaves"})
+# The only bus transaction Runtime-LOG ever makes: after a run, with the master Idle, read these objects.
+SDO_READ_ALLOWED = {0x603F: "uint16", 0x6041: "uint16"}
 
 _COUNTER_KEYS = {
     "Tx frames": "tx_frames",
@@ -107,6 +109,15 @@ class EthercatPoller:
 
     def slave_states(self) -> list[dict]:
         return parse_slaves(self._call("slaves"))
+
+    def read_sdo(self, position: int, index: int, subindex: int = 0) -> int:
+        """SDO upload of a whitelisted object (post-stop error codes only)."""
+        kind = SDO_READ_ALLOWED.get(index)
+        if kind is None or subindex != 0:
+            raise ValueError(f"refusing SDO read of 0x{index:04X}:{subindex}")
+        text = self.runner([self.binary, "upload", "-m", str(self.master), "-p", str(position), "-t", kind, f"0x{index:04X}", str(subindex)])
+        token = text.split()[0] if text.split() else ""
+        return int(token, 16) if token.lower().startswith("0x") else int(token)
 
 
 class CounterTracker:

@@ -24,6 +24,8 @@ from .blackbox import BlackBox
 from .blackbox import Settings as BlackBoxSettings
 from .procfs import CpuSampler, ProcFS
 from .profile import Profile
+from .poststop import read_post_stop
+from .poststop import summarize as summarize_post_stop
 from .shm import SHM_DIR
 
 
@@ -429,6 +431,8 @@ class RunRecorder:
             summary["anomalies"]["cycle.overruns"] = overruns
         if gaps:
             summary["anomalies"]["blackbox.reader_gaps"] = gaps
+        expected_codes = (self.profile.ethercat.get("post_stop") or {}).get("expected_codes") or []
+        summary["anomalies"].update(summarize_post_stop(self.document.get("post_stop"), expected_codes))
         summary["anomalies"] = dict(sorted(summary["anomalies"].items()))
         summary["anomaly_total"] = sum(summary["anomalies"].values())
         self.document["blackbox"] = blackbox
@@ -468,6 +472,18 @@ class RunRecorder:
             if not box.reader.writer_alive():
                 box.reader.close()
                 box.path.unlink(missing_ok=True)
+        post_stop = self.profile.ethercat.get("post_stop") or {}
+        if not interrupted and self.uses_ethercat and not self.mock and self.poller is not None and post_stop.get("enabled"):
+            result = read_post_stop(self.poller, post_stop)
+            self.document["post_stop"] = result
+            for row in result.get("drives", []):
+                if row.get("error_code") or row.get("fault"):
+                    self._emit(Event(result["time"], "ecat", "ethercat", f"slave {row['position']}",
+                                     f"0x603F={row.get('error_code_hex')} 0x6041={row.get('status_word_hex')} {row.get('error_text', '')}".strip(),
+                                     "warn", rule="post_stop_error_code", label="停后驱动错误码"))
+            if result.get("skipped"):
+                self._emit(Event(result["time"], "ecat", "ethercat", "master", result["skipped"], "info",
+                                 rule="post_stop_skipped", label="停后错误码未读"))
         if self.tail.partial:
             line = parse_line(self.tail.partial.decode("utf-8", "replace"))
             if line is not None:
