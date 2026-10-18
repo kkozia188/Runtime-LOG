@@ -31,6 +31,29 @@
 - 每次运行都有周期统计（名义/平均/最小/最大周期、> 1.5 倍次数），来自记录控制器收到的实际周期。
 - 停机后：主站不在 Operation 时，SDO 读一次各驱动 0x603F/0x6041（只放行这两个对象）。
 - 依赖：`pip3 install --user -r requirements.txt`（mcap、zstandard）。
+- 使能管理器部署开启时把状态机（22 个字段）写入自己的段：阶段变化进时间线；紧急快停、紧急失能、失败和失败阶段
+  触发黑匣子（枚举名在 `profiles/rt_control.yaml` 的 `blackbox.enums`）。两份写入头文件（本仓库与 robot_driver
+  `rt_control_semantic_components`）用同一个黄金样本 `tests/fixtures/shm_format_v1.bin` 保证一致。
+- 黑匣子窗口目录：`window.mcap`、`trigger.json`、`kernel.log`、`timeline.json`（前 10 s / 后 3 s 的时间线片段与进程快照）。
+- 台架零差配置 `zeroerr_cia402_csp_diag` 额外记录速度、力矩（‰）、错误码，以及实际发出的目标位置与控制字
+  （ICube 补丁 0014 的 RxPDO 镜像）。
+
+## P2：1 kHz 性能实验（M2）
+
+- 自动：每个 JTC 轨迹目标（日志 `Accepted new action goal` → `Goal reached`/中止）记录一次实验，范围为目标前
+  0.2 s 到结束后 1 s；名字里带上 5 s 内的操作台操作（如“去位姿 home；档位 low”）。
+- 手动：`runtime-log experiment start 名字` / `runtime-log experiment stop`（最长 10 分钟）。
+- 数据：`experiments/<时刻>-<名字>/data.mcap`（全部记录字段，1 kHz）、`meta.json`（指标）、`plot.json`。
+- 指标（每个关节）：行程、运动时长、最大/运动中 RMS 跟随误差（实际发出的目标 − 实际位置）、超调、
+  到位时间（误差 < 0.05° 保持 0.1 s）、终点误差、静止抖动、峰值速度与力矩。
+- 页面：运行报告的“1 kHz 性能实验”表、实验详情（指标 + 曲线）、勾选两次实验对比（可跨运行）。
+
+## 页面
+
+- `/`：运行列表（筛选、搜索、黑匣子与实验数、勾选两次运行对比）。
+- `/<运行>/`：单次运行报告。`/compare?a=&b=`：两次运行对比。
+- `/live`：实时状态（运行中记录段的最新周期，0.5 s 刷新）。
+- `/<运行>/experiments/<实验>/`、`/compare_experiments?a=<运行>/<实验>&b=…`。
 
 ## 使用
 
