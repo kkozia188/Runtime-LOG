@@ -50,7 +50,7 @@ def analyse(path: Path, rt_tid: int, period_us: float) -> dict:
     if not cycles:
         return {"events": len(switch_ins)}
     deviation = [abs(c - period_us) for c in cycles]
-    foreign = {k: v for k, v in visitors.items() if not KERNEL_PER_CPU.match(k.split(":")[0])}
+    foreign = {k: v for k, v in visitors.items() if not KERNEL_PER_CPU.match(k.rsplit(":", 1)[0]) and not KERNEL_PER_CPU.match(k)}
     return {
         "cycles": len(cycles),
         "duration_s": round(switch_ins[-1] - switch_ins[0], 1),
@@ -64,7 +64,7 @@ def analyse(path: Path, rt_tid: int, period_us: float) -> dict:
         "over_50us": sum(d > 50 for d in deviation),
         "over_100us": sum(d > 100 for d in deviation),
         "short_gaps": sum(g < period_us / 2 for g in gaps),
-        "kernel_visitors": {k: v for k, v in visitors.items() if KERNEL_PER_CPU.match(k.split(":")[0])},
+        "kernel_visitors": {k: v for k, v in visitors.items() if KERNEL_PER_CPU.match(k.rsplit(":", 1)[0]) or KERNEL_PER_CPU.match(k)},
         "foreign_visitors": foreign,
     }
 
