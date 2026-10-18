@@ -128,7 +128,9 @@ def _anomalies(events: list[Event], shutdown_ts: Optional[float]) -> dict:
                     counts[f"ecat.{key}"] += int(event.data[key])
         elif event.kind == ECAT and event.rule in kernlog.ANOMALY_RULES:
             amount = event.data.get("count", 1) if event.rule.startswith("datagrams_") else 1
-            counts[f"ecat.{event.rule}"] += int(amount)
+            # Once shutdown has begun the drives lose sync by design (AL 0x001A etc.): count separately.
+            prefix = "shutdown.ecat" if shutdown_ts is not None and event.ts >= shutdown_ts else "ecat"
+            counts[f"{prefix}.{event.rule}"] += int(amount)
         elif event.kind == ERROR:
             counts["log.error_lines"] += 1
         elif event.kind == FAILURE:
@@ -143,7 +145,7 @@ def _anomalies(events: list[Event], shutdown_ts: Optional[float]) -> dict:
 
 def is_anomaly_key_informational(key: str) -> bool:
     """Counts shown but not highlighted (expected noise)."""
-    return key in ("log.warning_lines", "process.nonzero_exit_during_shutdown")
+    return key in ("log.warning_lines", "process.nonzero_exit_during_shutdown") or key.startswith("shutdown.")
 
 
 __all__ = ["summarize", "sort_events", "phase_of", "CONTROL"]
