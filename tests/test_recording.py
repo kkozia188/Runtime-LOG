@@ -244,6 +244,8 @@ def test_recorder_attaches_the_control_process_segment_and_reports_blackbox_even
     recorder.tick(recorder.start + 2)
     saved = [e for e in recorder.events if e.rule == "blackbox_saved"]
     assert saved and "drive_fault" in saved[0].data["reasons"]
+    context = json.loads((recorder.dir / "blackbox" / saved[0].data["dir"] / "timeline.json").read_text())
+    assert "events" in context and "processes" in context
     document = recorder.finish(recorder.start + 3)
     assert document["summary"]["anomalies"]["blackbox.drive_fault"] == 1
     assert document["blackbox"][0]["cycle_stats"]["cycles"] == 1900
@@ -398,3 +400,18 @@ def test_web_is_read_only(tmp_path, profile):
         assert error.value.code == 405
     finally:
         server.shutdown()
+
+
+def test_counter_increases_are_split_by_run_phase():
+    from runtime_log.model import Event
+    from runtime_log.summary_extra import enrich
+
+    summary = {"t0": 100.0, "anomalies": {}, "ready_s": 5.0, "shutdown_s": 50.0,
+               "phases": {"startup": [0.0, 5.0], "running": [5.0, 50.0], "stopping": [50.0, 52.0]}}
+    events = [Event(103.0, "ecat", "ethercat", rule="counter_increase", data={"lost_frames": 125, "tx_errors": 1739}),
+              Event(120.0, "ecat", "ethercat", rule="counter_increase", data={"lost_frames": 2, "tx_errors": 0}),
+              Event(151.0, "ecat", "ethercat", rule="counter_increase", data={"lost_frames": 7, "tx_errors": 1})]
+    result = enrich(summary, {}, events)
+    assert result["ecat_counters_by_phase"] == {"startup": {"lost_frames": 125, "tx_errors": 1739},
+                                                "running": {"lost_frames": 2, "tx_errors": 0},
+                                                "stopping": {"lost_frames": 7, "tx_errors": 1}}

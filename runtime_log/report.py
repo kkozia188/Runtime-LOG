@@ -323,7 +323,7 @@ def blackbox_section(run: dict, events: list[Event], t0: float) -> str:
     saved_rows = "".join(
         f'<tr class="hit"><td class="num">{e.ts - t0:.3f}</td><td>{esc(", ".join(e.data.get("reasons", [])))}</td><td class="mono">{esc(e.message[:200])}</td>'
         f'<td><a href="blackbox/{esc(e.data.get("dir"))}/window.mcap">window.mcap</a> · <a href="blackbox/{esc(e.data.get("dir"))}/trigger.json">trigger.json</a>'
-        f' · <a href="blackbox/{esc(e.data.get("dir"))}/kernel.log">kernel.log</a></td></tr>'
+        f' · <a href="blackbox/{esc(e.data.get("dir"))}/kernel.log">kernel.log</a> · <a href="blackbox/{esc(e.data.get("dir"))}/timeline.json">timeline.json</a></td></tr>'
         for e in saved
     )
     return (
@@ -332,6 +332,16 @@ def blackbox_section(run: dict, events: list[Event], t0: float) -> str:
         + (f'<br><table style="max-width:640px"><tr><th>关节</th><th>驱动状态（最后读到）</th><th>状态字</th><th>动力电</th><th>警告</th></tr>{state_rows}</table>' if state_rows else "")
         + (f'<br><table><tr><th>t (s)</th><th>触发原因</th><th>详情</th><th>文件（前 10 s、后 2 s）</th></tr>{saved_rows}</table>' if saved_rows else '<p class="k">没有触发。</p>')
     )
+
+
+def phase_counters(summary: dict) -> str:
+    by_phase = summary.get("ecat_counters_by_phase") or {}
+    if not by_phase:
+        return ""
+    names = {"startup": "启动", "running": "运行", "stopping": "停止"}
+    rows = "".join(f'<tr class="{"hit" if v["lost_frames"] or v["tx_errors"] else ""}"><td>{names.get(k, k)}</td><td class="num">{v["lost_frames"]}</td>'
+                   f'<td class="num">{v["tx_errors"]}</td></tr>' for k, v in by_phase.items())
+    return f'<br><table style="max-width:420px"><tr><th>阶段</th><th>丢帧增量</th><th>发送错误增量</th></tr>{rows}</table>'
 
 
 def render(run: dict, events: list[Event], run_dir: Optional[Path] = None) -> str:
@@ -432,7 +442,7 @@ def render(run: dict, events: list[Event], run_dir: Optional[Path] = None) -> st
 <h2>启动步骤</h2><table><tr><th>t (s)</th><th>步骤</th><th>原文</th></tr>{stage_rows or '<tr><td colspan="3">无</td></tr>'}</table>
 <h2>资源</h2>{line_chart(cpu, t_max, "%", "进程 CPU（%，单核 = 100）")}{line_chart(rss, t_max, " MiB", "进程常驻内存（MiB）")}{line_chart(threads, t_max, "%", "ros2_control_node 线程 CPU（前 8）")}
 <h2>ros2_control_node 线程</h2><table><tr><th>tid</th><th>名称</th><th>策略</th><th>RT 优先级</th><th>允许 CPU</th><th>实际运行 CPU</th><th>峰值 CPU %</th><th>首次出现 (s)</th></tr>{thread_rows or '<tr><td colspan="8">无采样</td></tr>'}</table>
-<h2>EtherCAT 主站计数</h2>{counters_table(ecat_rows)}
+<h2>EtherCAT 主站计数</h2>{counters_table(ecat_rows)}{phase_counters(summary)}
 <h2>事件</h2><div class="filters"><label><input type="checkbox" id="onlyIssues"> 只看 WARN/ERROR</label><label><input type="checkbox" id="hideControl"> 隐藏控制事件</label></div>
 <table id="events"><tr><th>t (s)</th><th>类型</th><th>来源</th><th>对象</th><th>规则</th><th>内容</th></tr>{"".join(event_rows)}</table>
 <h2>部署与版本</h2>

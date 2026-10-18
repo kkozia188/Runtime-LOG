@@ -22,7 +22,7 @@ from .report import CSS, RESULT_COLOR, RESULT_LABEL, fmt_s, fmt_time, render
 
 LOG = logging.getLogger("runtime_log.web")
 EXPERIMENT_FILES = {"data.mcap", "meta.json", "plot.json"}
-BLACKBOX_FILES = {"window.mcap", "trigger.json", "kernel.log"}
+BLACKBOX_FILES = {"window.mcap", "trigger.json", "kernel.log", "timeline.json"}
 RUN_FILES = {"report.html", "run.json", "events.jsonl", "resources.jsonl", "ethercat.jsonl", "launch.log.gz"}
 
 
@@ -177,7 +177,7 @@ class Handler(BaseHTTPRequestHandler):
             if not target.is_file():
                 self._send(404, b"not found", "text/plain", head)
                 return
-            kinds = {"window.mcap": "application/octet-stream", "trigger.json": "application/json", "kernel.log": "text/plain; charset=utf-8"}
+            kinds = {"window.mcap": "application/octet-stream", "trigger.json": "application/json", "kernel.log": "text/plain; charset=utf-8", "timeline.json": "application/json"}
             self._send(200, target.read_bytes(), kinds[parts[3]], head)
             return
         name = parts[1]

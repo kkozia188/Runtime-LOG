@@ -26,8 +26,8 @@ from .blackbox import Settings as BlackBoxSettings
 from .procfs import CpuSampler, ProcFS
 from .profile import Profile
 from .sendtrace import read_send_trace
+from .summary_extra import enrich
 from .poststop import read_post_stop
-from .poststop import summarize as summarize_post_stop
 from .shm import SHM_DIR
 
 
@@ -215,7 +215,10 @@ class RunRecorder:
             intent = operator.label + (" " + operator.message.split("；")[0] if operator.message else "") if operator and event.ts - operator.ts < 5.0 else ""
             name = f"goal-{self.goal_count}"
             for box in boxes:
-                box.start_experiment(name, "auto:jtc_goal", event.ts - 0.2, {"intent": intent.strip(), "goal_log": event.message[:200]})
+                box.start_experiment(name, "auto:jtc_goal", event.ts - 0.2, {
+                    "intent": intent.strip(), "goal_log": event.message[:200],
+                    "operator": {"label": operator.label, "message": operator.message, "ok": operator.data.get("ok")}
+                    if operator and event.ts - operator.ts < 5.0 else None})
         else:
             for box in boxes:
                 box.stop_experiment(event.ts + 1.0)
@@ -346,6 +349,7 @@ class RunRecorder:
                                  "info", rule=f"state_{item['field']}", label=f"{item['title']}：{item['new_label']}",
                                  data={"old": item["old"], "new": item["new"]}))
             elif item["kind"] == "blackbox_saved":
+                self._write_window_context(item)
                 self._emit(Event(item["ts"], "blackbox", "runtime-log", item["dir"], item.get("detail", ""), "error",
                                  rule="blackbox_saved", label="黑匣子触发：" + ", ".join(item["reasons"]), data={"reasons": item["reasons"], "dir": item["dir"]}))
             else:
@@ -359,6 +363,22 @@ class RunRecorder:
         end = None if self.ended is None else self.ended + 3.0
         for event in console_audit.parse_lines(self.audit_tail.read(), self.domain, self.start - 1.0, end):
             self._emit(event)
+
+    def _write_window_context(self, item: dict) -> None:
+        """Next to a saved window: timeline fragment (-10 s / +3 s) and the latest process snapshot."""
+        target = self.dir / "blackbox" / item["dir"]
+        ts = item["ts"]
+        fragment = [e.to_dict(self.start) for e in list(self.events) if ts - 10.0 <= e.ts <= ts + 3.0]
+        try:
+            lines = (self.dir / "resources.jsonl").read_text(encoding="utf-8").splitlines()
+            snapshot = json.loads(lines[-1]) if lines else {}
+        except (OSError, ValueError):
+            snapshot = {}
+        try:
+            write_json(target / "timeline.json", {"events": fragment, "processes": snapshot,
+                                                  "threads": self._resource_summary().get("threads", [])})
+        except OSError:
+            pass
 
     def manual_trigger(self, reason: str) -> int:
         for box in self._active_boxes():
@@ -484,23 +504,9 @@ class RunRecorder:
 
     def _summarize(self, **kwargs) -> dict:
         summary = timeline.summarize(self.events, self.profile.ready_stages, optional_processes=self.profile.run.get("optional_processes", []), **kwargs)
-        blackbox = self._blackbox_summary()
-        overruns = sum((box["cycle_stats"].get("overruns") or 0) for box in blackbox)
-        gaps = sum(box["gaps"] for box in blackbox)
-        if overruns:
-            summary["anomalies"]["cycle.overruns"] = overruns
-        if gaps:
-            summary["anomalies"]["blackbox.reader_gaps"] = gaps
-        trace = self.document.get("send_trace") or {}
-        burst = sum(phase.get("gaps_below_burst", 0) for phase in (trace.get("phases") or {}).values())
-        if burst:
-            summary["anomalies"]["ecat.send_burst"] = burst
+        self.document["blackbox"] = self._blackbox_summary()
         expected_codes = (self.profile.ethercat.get("post_stop") or {}).get("expected_codes") or []
-        summary["anomalies"].update(summarize_post_stop(self.document.get("post_stop"), expected_codes))
-        summary["anomalies"] = dict(sorted(summary["anomalies"].items()))
-        summary["anomaly_total"] = sum(summary["anomalies"].values())
-        self.document["blackbox"] = blackbox
-        return summary
+        return enrich(summary, self.document, self.events, expected_codes)
 
     def flush(self, now: float) -> None:
         for writer in (self.events_out, self.resources_out, self.ecat_out):

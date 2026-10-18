@@ -17,6 +17,7 @@ from .model import Event
 from .procfs import ProcFS
 from .profile import Profile
 from .recorder import counter_events, load_run
+from .summary_extra import enrich
 from .report import read_jsonl, write_report
 from .sources import kernel_events, launch_events
 
@@ -137,6 +138,8 @@ def replay(run_dir: Path, profile: Profile) -> tuple[dict, list[Event]]:
     summary = timeline.summarize(events, profile.ready_stages, running=running, optional_processes=profile.run.get("optional_processes", []))
     if document.get("result") == "interrupted" and summary["result"] in ("aborted", "running"):
         summary["result"] = "interrupted"
+    expected_codes = (profile.ethercat.get("post_stop") or {}).get("expected_codes") or []
+    summary = enrich(summary, document, events, expected_codes)
     document["summary"] = summary
     document["result"] = summary["result"]
     if not running:
