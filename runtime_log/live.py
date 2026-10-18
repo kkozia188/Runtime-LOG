@@ -72,24 +72,24 @@ def decode(fields: dict, enums: dict) -> dict:
         else:
             values[name] = _num(value)
     rows = []
-    for joint, values in sorted(joints.items()):
+    for joint, channels in sorted(joints.items()):
         row = {"joint": joint}
-        if "status_word" in values and values["status_word"] == values["status_word"]:
-            info = cia402.decode(int(values["status_word"]))
+        if "status_word" in channels and channels["status_word"] == channels["status_word"]:
+            info = cia402.decode(int(channels["status_word"]))
             row.update(state=info["label"], status_word=info["word"], power=info["voltage_enabled"], warning=info["warning"])
         for key in ("position", "target_position"):
-            if key in values:
-                row[f"{key}_deg"] = _num(values[key] * RAD2DEG)
-        if "position" in values and "target_position" in values:
-            row["error_deg"] = _num((values["target_position"] - values["position"]) * RAD2DEG, 5)
-        if "velocity" in values:
-            row["velocity_deg_s"] = _num(values["velocity"] * RAD2DEG, 3)
-        if "torque_permille" in values:
-            row["torque_permille"] = _num(values["torque_permille"], 1)
-        if "error_code" in values and values["error_code"] == values["error_code"]:
-            row["error_code"] = f"0x{int(values['error_code']):04X}"
-        if "control_word_sent" in values and values["control_word_sent"] == values["control_word_sent"]:
-            row["control_word"] = f"0x{int(values['control_word_sent']):04X}"
+            if key in channels:
+                row[f"{key}_deg"] = _num(channels[key] * RAD2DEG)
+        if "position" in channels and "target_position" in channels:
+            row["error_deg"] = _num((channels["target_position"] - channels["position"]) * RAD2DEG, 5)
+        if "velocity" in channels:
+            row["velocity_deg_s"] = _num(channels["velocity"] * RAD2DEG, 3)
+        if "torque_permille" in channels:
+            row["torque_permille"] = _num(channels["torque_permille"], 1)
+        if "error_code" in channels and channels["error_code"] == channels["error_code"]:
+            row["error_code"] = f"0x{int(channels['error_code']):04X}"
+        if "control_word_sent" in channels and channels["control_word_sent"] == channels["control_word_sent"]:
+            row["control_word"] = f"0x{int(channels['control_word_sent']):04X}"
         rows.append(row)
     return {"joints": rows, "bus": bus, "states": states, "values": values}
 

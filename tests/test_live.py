@@ -41,3 +41,11 @@ def test_live_routes(tmp_path):
         assert json.loads(urllib.request.urlopen(base + "/live.json").read())["runs"] == []
     finally:
         server.shutdown()
+
+
+def test_joint_channels_do_not_leak_into_scalar_values(profile):
+    from runtime_log.live import decode
+
+    decoded = decode({"left_joint1/position": 0.1, "left_joint1/target_position": 0.1, "phase": 2.0, "owner": 1.0}, profile.blackbox["enums"])
+    assert decoded["values"] == {"owner": 1.0}
+    assert decoded["joints"][0]["joint"] == "left_joint1"
