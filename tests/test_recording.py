@@ -415,3 +415,23 @@ def test_counter_increases_are_split_by_run_phase():
     assert result["ecat_counters_by_phase"] == {"startup": {"lost_frames": 125, "tx_errors": 1739},
                                                 "running": {"lost_frames": 2, "tx_errors": 0},
                                                 "stopping": {"lost_frames": 7, "tx_errors": 1}}
+
+
+def test_derived_events_survive_a_service_restart(tmp_path, profile, artifact_dir):
+    from runtime_log.model import Event
+
+    log_dir = tmp_path / f"2026-10-18-14-47-48-1-ar-Default-string-{LAUNCH_PID}"
+    log_dir.mkdir()
+    (log_dir / "launch.log").write_text((FIXTURES / "launch_normal.log").read_text())
+    archive = Archive(tmp_path / "runs")
+    proc = FakeProc(artifact_dir)
+    first = RunRecorder(LAUNCH_PID, log_dir, profile, archive, proc, None)
+    first._emit(Event(first.start + 5, "state", "controller", "phase", "使能状态机：启动清理 → 空闲", rule="state_phase"))
+    first._emit(Event(first.start + 6, "blackbox", "runtime-log", "x", "", "error", rule="blackbox_saved", data={"reasons": ["drive_fault"], "dir": "d"}))
+    first.flush(first.start + 7)
+    first.events_out.close()
+    second = RunRecorder(LAUNCH_PID, log_dir, profile, archive, proc, None)
+    assert second.id == first.id
+    assert [e.rule for e in second.events if e.kind in ("state", "blackbox")] == ["state_phase", "blackbox_saved"]
+    third = RunRecorder(LAUNCH_PID, log_dir, profile, archive, proc, None)  # restored events are not duplicated
+    assert len([e for e in third.events if e.kind in ("state", "blackbox")]) == 2

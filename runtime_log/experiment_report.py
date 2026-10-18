@@ -55,8 +55,22 @@ def experiments_of(run: dict) -> list[dict]:
     return sorted(rows, key=lambda r: r.get("start") or 0)
 
 
+def experiments_on_disk(run_dir: Optional[Path]) -> list[dict]:
+    rows = []
+    if run_dir is None:
+        return rows
+    for meta_path in sorted((run_dir / "experiments").glob("*/meta.json")):
+        try:
+            meta = json.loads(meta_path.read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            continue
+        rows.append({"dir": meta_path.parent.name, "name": meta.get("name"), "source": meta.get("source"),
+                     "start": meta.get("start"), "duration_s": meta.get("duration_s", 0), "summary": meta.get("summary") or {}})
+    return rows
+
+
 def experiments_section(run: dict, run_dir: Optional[Path]) -> str:
-    rows = experiments_of(run)
+    rows = experiments_on_disk(run_dir) or experiments_of(run)
     if not rows:
         return '<p class="k">没有实验。每次轨迹目标（JTC）会自动记录一次；也可用 <code>runtime-log experiment start/stop</code> 手动记录。</p>'
     t0 = (run.get("summary") or {}).get("t0") or run.get("start") or 0

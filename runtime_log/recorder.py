@@ -146,6 +146,7 @@ class RunRecorder:
         self.audit_tail = LogTail(audit_path) if audit_path else None
         if previous:
             self._restore_polled_events()
+            self._restore_derived_events()
         self.document = {
             "id": self.id,
             "source": "live",
@@ -233,10 +234,29 @@ class RunRecorder:
                 box.stop_experiment(now)
         return len(boxes)
 
-    def _emit(self, event: Event) -> None:
+    DERIVED_KINDS = ("blackbox", "state", "experiment")
+
+    def _emit(self, event: Event, persist_derived: bool = True) -> None:
         self._experiment_hooks(event)
         self.events.append(event)
         self.events_out.write(event.to_dict(self.start))
+        # Events derived from the shared memory cannot be rebuilt from launch.log after a service
+        # restart: keep them in an append-only file that survives the restart.
+        if persist_derived and event.kind in self.DERIVED_KINDS:
+            with (self.dir / "derived.jsonl").open("a", encoding="utf-8") as stream:
+                stream.write(json.dumps(event.to_dict(self.start), ensure_ascii=False, separators=(",", ":")) + "\n")
+
+    def _restore_derived_events(self) -> None:
+        path = self.dir / "derived.jsonl"
+        if not path.exists():
+            return
+        for line in path.read_text(encoding="utf-8").splitlines():
+            try:
+                event = Event.from_dict(json.loads(line))
+            except (ValueError, TypeError):
+                continue
+            self.events.append(event)
+            self.events_out.write(event.to_dict(self.start))
 
     # ------------------------------------------------------------------ sampling
     def poll_log(self) -> None:
@@ -505,6 +525,8 @@ class RunRecorder:
     def _summarize(self, **kwargs) -> dict:
         summary = timeline.summarize(self.events, self.profile.ready_stages, optional_processes=self.profile.run.get("optional_processes", []), **kwargs)
         self.document["blackbox"] = self._blackbox_summary()
+        self.document["experiment_count"] = len(list((self.dir / "experiments").glob("*/meta.json")))
+        self.document["blackbox_saved_count"] = len(list((self.dir / "blackbox").glob("*/trigger.json")))
         expected_codes = (self.profile.ethercat.get("post_stop") or {}).get("expected_codes") or []
         return enrich(summary, self.document, self.events, expected_codes)
 
