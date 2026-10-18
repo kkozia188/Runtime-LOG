@@ -19,6 +19,7 @@ from pathlib import Path
 from typing import Callable, Optional
 
 from . import cia402
+from .experiment import Experiment, has_tracking_fields
 from .shm import ShmReader
 
 LOG = logging.getLogger("runtime_log.blackbox")
@@ -64,6 +65,7 @@ class Settings:
     overrun_factor: float = 1.5  # counted in the cycle statistics
     overrun_trigger_factor: float = 3.0  # saves a window (a whole cycle was lost)
     stall_s: float = 0.2
+    experiment_max_s: float = 600.0
     # {field: {title, names, labels, trigger}} for enum fields of instrumented controllers.
     enums: dict = field(default_factory=dict)
 
@@ -219,6 +221,12 @@ class BlackBox(threading.Thread):
         self.last_head = 0
         self.last_head_change = time.monotonic()
         self.writer_stopped_reported = False
+        # M2 experiments (only for segments that carry position + target_position).
+        self.experiments_dir = out_dir.parent / "experiments"
+        self.tracking = has_tracking_fields(self.reader.fields)
+        self.experiment_commands: "queue.Queue[tuple]" = queue.Queue()
+        self.experiment: Optional[Experiment] = None
+        self.experiments: list[dict] = []
 
     # ------------------------------------------------------------------ public (any thread)
     def trigger(self, reason: str, epoch_s: Optional[float] = None, detail: str = "") -> None:
@@ -226,6 +234,16 @@ class BlackBox(threading.Thread):
 
     def stop(self) -> None:
         self.stop_requested.set()
+
+    def start_experiment(self, name: str, source: str, start_ts: float, meta: Optional[dict] = None) -> bool:
+        if not self.tracking:
+            return False
+        self.experiment_commands.put(("start", name, source, start_ts, meta or {}))
+        return True
+
+    def stop_experiment(self, stop_ts: float) -> None:
+        if self.tracking:
+            self.experiment_commands.put(("stop", stop_ts))
 
     def describe(self) -> dict:
         return {
@@ -238,6 +256,7 @@ class BlackBox(threading.Thread):
             "drive_states": self.scanner.drive_states(),
             "saved": list(self.saved),
             "expected_transitions": list(self.expected[-50:]),
+            "experiments": list(self.experiments),
         }
 
     # ------------------------------------------------------------------ thread
@@ -271,6 +290,9 @@ class BlackBox(threading.Thread):
                 for event in self.scanner.state_events:
                     self.on_event(event)
                 self.scanner.state_events.clear()
+            if self.experiment is not None:
+                self._experiment_slot(seq, slot)
+        self._experiment_requests()
         while len(self.history) > keep:
             self.history.popleft()
         self._external_triggers()
@@ -281,10 +303,80 @@ class BlackBox(threading.Thread):
             reason = "writer_died" if not writer_alive else "writer_stalled"
             self._add_trigger(Trigger(seq, SLOT_HEAD.unpack_from(slot, 0)[1], reason, f"head {self.last_head}"))
             self.writer_stopped_reported = True
+        if self.experiment is not None and (final or not writer_alive or self.reader.writer_state != "active"):
+            last_time = SLOT_HEAD.unpack_from(self.history[-1][1], 0)[1] / 1e9 if self.history else self.experiment.start_ts
+            self._finish_experiment(min(self.experiment.stop_ts or last_time, last_time))
         if self.pending is not None:
             writer_done = final or not writer_alive or self.reader.writer_state != "active" or stalled
             if self.history and (self.history[-1][0] >= self.pending.until_seq or writer_done):
                 self._dump()
+
+    # ------------------------------------------------------------------ experiments
+    def _experiment_slot(self, seq: int, slot: bytes) -> None:
+        experiment = self.experiment
+        t = SLOT_HEAD.unpack_from(slot, 0)[1] / 1e9
+        if t < experiment.start_ts:
+            return
+        if experiment.stop_ts is not None and t > experiment.stop_ts:
+            self._finish_experiment(experiment.stop_ts)
+            return
+        experiment.add(seq, slot)
+        if t - experiment.start_ts >= experiment.max_duration_s:
+            experiment.meta["truncated"] = f"max {experiment.max_duration_s:.0f} s"
+            self._finish_experiment(t)
+
+    def _experiment_requests(self) -> None:
+        backfill = False
+        while True:
+            try:
+                command = self.experiment_commands.get_nowait()
+            except queue.Empty:
+                break
+            if command[0] == "stop":
+                if self.experiment is not None:
+                    self.experiment.stop_ts = command[1]
+                continue
+            _, name, source, start_ts, meta = command
+            if self.experiment is not None:
+                if backfill:
+                    self._backfill()
+                self._finish_experiment(start_ts)
+            stamp = time.strftime("%Y%m%d-%H%M%S", time.localtime(start_ts)) + f".{int((start_ts % 1) * 1000):03d}"
+            safe = "".join(c if c.isascii() and (c.isalnum() or c in "_-") else "_" for c in name)[:60]
+            self.experiment = Experiment(self.experiments_dir / f"{stamp}-{safe}", name, source, self.reader.fields,
+                                         self.reader.writer_name, start_ts, meta, self.settings.experiment_max_s)
+            backfill = True
+        if self.experiment is None:
+            return
+        if backfill:
+            self._backfill()
+        stop = self.experiment.stop_ts
+        last = SLOT_HEAD.unpack_from(self.history[-1][1], 0)[1] / 1e9 if self.history else 0.0
+        if stop is not None and last >= stop:
+            self._finish_experiment(stop)
+
+    def _backfill(self) -> None:
+        """Cycles of the new experiment already in the 30 s history, within [start, stop]."""
+        experiment = self.experiment
+        for seq, slot in self.history:
+            t = SLOT_HEAD.unpack_from(slot, 0)[1] / 1e9
+            if t >= experiment.start_ts and (experiment.stop_ts is None or t <= experiment.stop_ts):
+                experiment.add(seq, slot)
+
+    def _finish_experiment(self, stop_ts: float) -> None:
+        experiment, self.experiment = self.experiment, None
+        if experiment is None:
+            return
+        experiment.stop_ts = stop_ts
+        try:
+            document = experiment.finish()
+        except Exception:  # noqa: BLE001 - never let a metric bug stop the black box
+            LOG.exception("experiment %s failed", experiment.name)
+            return
+        entry = {"dir": experiment.directory.name, "name": experiment.name, "source": experiment.source,
+                 "start": experiment.start_ts, "duration_s": document["duration_s"], "summary": document["summary"]}
+        self.experiments.append(entry)
+        self.on_event({"kind": "experiment_saved", "ts": experiment.start_ts, **entry})
 
     def _external_triggers(self) -> None:
         while True:

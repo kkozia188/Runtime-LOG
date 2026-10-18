@@ -87,6 +87,8 @@ class RunRecorder:
         self.shm_dir = shm_dir
         self.blackbox_settings = blackbox_settings or BlackBoxSettings(enums=profile.blackbox.get("enums", {}) or {})
         self.blackboxes: dict[str, BlackBox] = {}
+        self.goal_count = 0
+        self.last_operator: Optional[Event] = None
         self.blackbox_events: "queue.Queue[dict]" = queue.Queue()
         self.next_attach = 0.0
         self.log_dir = log_dir
@@ -197,7 +199,39 @@ class RunRecorder:
                 self._emit(Event(row["ts"], "ecat", "ethercat", "slaves", states, "info", rule="slave_states_polled", label="从站状态（轮询）"))
                 self.last_slave_states = states
 
+    def _experiment_hooks(self, event: Event) -> None:
+        """One auto experiment per trajectory goal; only for live goals (not log replays)."""
+        if event.kind == "operator":
+            self.last_operator = event
+            return
+        if event.kind != "control" or event.rule not in ("goal_accepted", "goal_reached", "goal_aborted"):
+            return
+        if self.clock() - event.ts > 20.0:
+            return
+        boxes = [box for box in self._active_boxes() if box.tracking]
+        if event.rule == "goal_accepted":
+            self.goal_count += 1
+            operator = self.last_operator
+            intent = operator.label + (" " + operator.message.split("；")[0] if operator.message else "") if operator and event.ts - operator.ts < 5.0 else ""
+            name = f"goal-{self.goal_count}"
+            for box in boxes:
+                box.start_experiment(name, "auto:jtc_goal", event.ts - 0.2, {"intent": intent.strip(), "goal_log": event.message[:200]})
+        else:
+            for box in boxes:
+                box.stop_experiment(event.ts + 1.0)
+
+    def manual_experiment(self, action: str, name: str = "") -> int:
+        boxes = [box for box in self._active_boxes() if box.tracking]
+        now = self.clock()
+        for box in boxes:
+            if action == "start":
+                box.start_experiment(name or "manual", "manual", now, {"intent": name})
+            else:
+                box.stop_experiment(now)
+        return len(boxes)
+
     def _emit(self, event: Event) -> None:
+        self._experiment_hooks(event)
         self.events.append(event)
         self.events_out.write(event.to_dict(self.start))
 
@@ -301,7 +335,13 @@ class RunRecorder:
                 item = self.blackbox_events.get_nowait()
             except queue.Empty:
                 return
-            if item["kind"] == "state_change":
+            if item["kind"] == "experiment_saved":
+                summary = item.get("summary") or {}
+                text = (f"{item['duration_s']:.2f} s，运动关节 {summary.get('moving_joints', 0)}，最大跟随误差 "
+                        f"{summary.get('max_error_deg')}°（{summary.get('max_error_joint')}）")
+                self._emit(Event(item["ts"], "experiment", "runtime-log", item["dir"], text, "info", rule="experiment_saved",
+                                 label=f"实验：{item['name']}", data={"dir": item["dir"], "summary": summary}))
+            elif item["kind"] == "state_change":
                 self._emit(Event(item["ts"], "state", "controller", item["field"], f"{item['title']}：{item['old_label']} → {item['new_label']}",
                                  "info", rule=f"state_{item['field']}", label=f"{item['title']}：{item['new_label']}",
                                  data={"old": item["old"], "new": item["new"]}))

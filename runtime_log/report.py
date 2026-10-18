@@ -158,6 +158,7 @@ def gantt(summary: dict, events: list[Event], ecat_rows: list[dict], t0: float, 
     markers("失败/停止", [e for e in events if e.kind in (FAILURE, SHUTDOWN, SIGNAL)], lambda e: "#cf222e" if e.kind == FAILURE else "#9a6700")
     markers("控制事件", [e for e in events if e.kind == CONTROL], lambda e: "#8250df")
     markers("控制器状态", [e for e in events if e.kind == "state"], lambda e: "#0550ae")
+    markers("实验", [e for e in events if e.kind == "experiment"], lambda e: "#1a7f37")
     markers("操作台", [e for e in events if e.kind == "operator"], lambda e: "#1b7c83" if e.data.get("ok", True) else "#bf8700")
     markers("黑匣子", [e for e in events if e.rule in ("blackbox_saved", "blackbox_expected")], lambda e: "#cf222e" if e.rule == "blackbox_saved" else "#8c959f")
     markers("EtherCAT 内核", [e for e in events if e.kind == ECAT and e.source == "kernel"], lambda e: {"error": "#cf222e", "warn": "#bf8700"}.get(e.level, "#57606a"))
@@ -191,23 +192,39 @@ def gantt(summary: dict, events: list[Event], ecat_rows: list[dict], t0: float, 
     return f'<svg width="{scale.width}" height="{height}" viewBox="0 0 {scale.width} {height}">{body}</svg><div class="legend">{legend}<span>竖线悬停可看详情</span></div>'
 
 
-def line_chart(series: dict[str, list[tuple[float, float]]], t_max: float, unit: str, title: str) -> str:
+def line_chart(series: dict[str, list[tuple[float, float]]], t_max: float, unit: str, title: str, signed: bool = False) -> str:
+    series = {name: [(t, v) for t, v in points if v == v] for name, points in series.items()}
+    series = {name: points for name, points in series.items() if points}
     if not series:
         return '<p class="k">无采样</p>'
     scale = Scale(t_max, left=60)
     height, top = 180, 10
     values = [v for points in series.values() for _, v in points]
-    v_max = max(values + [1.0]) * 1.1
+    if signed:
+        low, high = min(values), max(values)
+        pad = (high - low) * 0.05 or max(abs(high), 1e-6) * 0.05
+        v_min, v_max = low - pad, high + pad
+    else:
+        v_min, v_max = 0.0, max(values + [1.0]) * 1.1
+    span = (v_max - v_min) or 1.0
+
+    def y_of(v: float) -> float:
+        return top + height - (v - v_min) / span * height
+
     parts = [scale.axis(top, height)]
     for fraction in (0, 0.5, 1):
-        y = top + height - fraction * height
-        parts.append(f'<line x1="60" y1="{y:.1f}" x2="{scale.width - 20}" y2="{y:.1f}" stroke="#eaeef2"/><text x="54" y="{y + 4:.1f}" text-anchor="end">{v_max * fraction:.0f}</text>')
+        v = v_min + span * fraction
+        label = f"{v:.0f}" if not signed else f"{v:.4g}"
+        parts.append(f'<line x1="60" y1="{y_of(v):.1f}" x2="{scale.width - 20}" y2="{y_of(v):.1f}" stroke="#eaeef2"/>'
+                     f'<text x="54" y="{y_of(v) + 4:.1f}" text-anchor="end">{label}</text>')
     legend = []
-    for index, (name, points) in enumerate(sorted(series.items(), key=lambda kv: -max(v for _, v in kv[1]))):
+    for index, (name, points) in enumerate(sorted(series.items(), key=lambda kv: -max(abs(v) for _, v in kv[1]))):
         color = PALETTE[index % len(PALETTE)]
-        path = " ".join(f"{scale.x(t):.1f},{top + height - v / v_max * height:.1f}" for t, v in points)
+        path = " ".join(f"{scale.x(t):.1f},{y_of(v):.1f}" for t, v in points)
         parts.append(f'<polyline fill="none" stroke="{color}" stroke-width="1.5" points="{path}"><title>{esc(name)}</title></polyline>')
-        legend.append(f'<span><i style="background:{color}"></i>{esc(name)} 峰值 {max(v for _, v in points):.1f}{unit}</span>')
+        peak = max((v for _, v in points), key=abs)
+        legend.append(f'<span><i style="background:{color}"></i>{esc(name)} 峰值 {peak:.4g}{unit}</span>' if signed else
+                      f'<span><i style="background:{color}"></i>{esc(name)} 峰值 {max(v for _, v in points):.1f}{unit}</span>')
     total = height + top + 22
     return f'<div class="k">{esc(title)}</div><svg width="{scale.width}" height="{total}" viewBox="0 0 {scale.width} {total}">{"".join(parts)}</svg><div class="legend">{"".join(legend)}</div>'
 
@@ -318,6 +335,8 @@ def blackbox_section(run: dict, events: list[Event], t0: float) -> str:
 
 
 def render(run: dict, events: list[Event], run_dir: Optional[Path] = None) -> str:
+    from .experiment_report import experiments_section  # local: experiment_report imports this module
+
     summary = run.get("summary") or {}
     t0 = summary.get("t0") or run.get("start") or 0.0
     t_max = max(summary.get("duration_s") or 0.0, 1.0)
@@ -406,6 +425,7 @@ def render(run: dict, events: list[Event], run_dir: Optional[Path] = None) -> st
 <div class="card grid">{facts_html}</div>
 <h2>异常计数</h2><table style="max-width:520px"><tr><th>项目</th><th>次数</th></tr>{anomaly_rows}</table>
 <h2>1 kHz 黑匣子</h2>{blackbox_section(run, events, t0)}
+<h2>1 kHz 性能实验</h2>{experiments_section(run, run_dir)}
 <h2>停后驱动错误码</h2>{post_stop_section(run)}
 {send_trace_section(run)}
 {zoom}<h2>时间线（全程）</h2>{gantt(summary, events, ecat_rows, t0, t_max)}

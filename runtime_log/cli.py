@@ -60,6 +60,10 @@ def main(argv=None) -> int:
     trig = commands.add_parser("trigger", help="save a black-box window now (all running recorders)")
     trig.add_argument("reason", nargs="?", default="manual")
 
+    exp = commands.add_parser("experiment", help="start/stop a manual 1 kHz experiment recording")
+    exp.add_argument("action", choices=["start", "stop"])
+    exp.add_argument("name", nargs="?", default="manual")
+
     commands.add_parser("gc", help="apply retention and the disk-space guard now")
     commands.add_parser("list", help="print the run index")
 
@@ -117,6 +121,16 @@ def main(argv=None) -> int:
         path = control / f"trigger-{_time.time():.3f}"
         path.write_text(args.reason, encoding="utf-8")
         print(f"requested: {path} (the service picks it up within 1 s)")
+        return 0
+
+    if args.command == "experiment":
+        import time as _time
+
+        control = archive.root.parent / "control"
+        control.mkdir(parents=True, exist_ok=True)
+        path = control / f"experiment-{args.action}-{_time.time():.3f}"
+        path.write_text(args.name, encoding="utf-8")
+        print(f"requested experiment {args.action} '{args.name}' (picked up within 1 s)")
         return 0
 
     if args.command == "gc":

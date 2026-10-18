@@ -14,10 +14,12 @@ from urllib.parse import parse_qs, unquote, urlparse
 
 from .archive import INDEX, RUN_FILE, Archive, read_json
 from .compare import render_compare
+from .experiment_report import render_experiment, render_experiment_compare
 from .recorder import load_run
 from .report import CSS, RESULT_COLOR, RESULT_LABEL, fmt_s, fmt_time, render
 
 LOG = logging.getLogger("runtime_log.web")
+EXPERIMENT_FILES = {"data.mcap", "meta.json", "plot.json"}
 BLACKBOX_FILES = {"window.mcap", "trigger.json", "kernel.log"}
 RUN_FILES = {"report.html", "run.json", "events.jsonl", "resources.jsonl", "ethercat.jsonl", "launch.log.gz"}
 
@@ -111,6 +113,20 @@ class Handler(BaseHTTPRequestHandler):
             (run_a, events_a), (run_b, events_b) = load_run(dirs[0]), load_run(dirs[1])
             self._send(200, render_compare(run_a, events_a, run_b, events_b).encode(), "text/html; charset=utf-8", head)
             return
+        if parts == ["compare_experiments"]:
+            query = parse_qs(urlparse(self.path).query)
+            picked = []
+            for key in ("a", "b"):
+                value = query.get(key, [""])[0]
+                run_name, _, exp_name = value.partition("/")
+                exp_dir = root / run_name / "experiments" / exp_name
+                if not run_name or not exp_name or "/" in exp_name or run_name.startswith(".") or exp_name.startswith(".") \
+                        or not (exp_dir / "meta.json").is_file():
+                    self._send(404, "选择两个已存在的实验（运行ID/实验目录）".encode(), "text/plain; charset=utf-8", head)
+                    return
+                picked.append((value, read_json(exp_dir / "meta.json", {})))
+            self._send(200, render_experiment_compare(picked[0], picked[1]).encode(), "text/html; charset=utf-8", head)
+            return
         if parts == ["index.json"]:
             self._send(200, (root / INDEX).read_bytes() if (root / INDEX).exists() else b"{}", "application/json", head)
             return
@@ -126,6 +142,25 @@ class Handler(BaseHTTPRequestHandler):
                 self.end_headers()
                 return
             parts.append("report.html")
+        if len(parts) in (3, 4) and parts[1] == "experiments" and not parts[2].startswith(".") and "/" not in parts[2]:
+            exp_dir = run_dir / "experiments" / parts[2]
+            name = parts[3] if len(parts) == 4 else ""
+            if not (exp_dir / "meta.json").is_file() or (name and name not in EXPERIMENT_FILES):
+                self._send(404, b"not found", "text/plain", head)
+                return
+            if len(parts) == 3 and not path.endswith("/"):
+                self.send_response(HTTPStatus.MOVED_PERMANENTLY)
+                self.send_header("Location", f"/{run_id}/experiments/{parts[2]}/")
+                self.end_headers()
+                return
+            if not name:
+                meta = read_json(exp_dir / "meta.json", {})
+                plot = read_json(exp_dir / "plot.json", {})
+                self._send(200, render_experiment(run_id, meta, plot).encode(), "text/html; charset=utf-8", head)
+                return
+            kinds = {"data.mcap": "application/octet-stream", "meta.json": "application/json", "plot.json": "application/json"}
+            self._send(200, (exp_dir / name).read_bytes(), kinds[name], head)
+            return
         if len(parts) == 4 and parts[1] == "blackbox" and parts[3] in BLACKBOX_FILES and not parts[2].startswith(".") and "/" not in parts[2]:
             target = run_dir / "blackbox" / parts[2] / parts[3]
             if not target.is_file():

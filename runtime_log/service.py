@@ -218,6 +218,18 @@ class Service:
                 path.unlink(missing_ok=True)
             count = sum(recorder.manual_trigger(reason) for recorder in self.recorders.values())
             LOG.info("manual trigger '%s' sent to %d black boxes", reason, count)
+        try:
+            requests = sorted(control.glob("experiment-*"))
+        except OSError:
+            return
+        for path in requests:
+            try:
+                name = path.read_text(encoding="utf-8", errors="replace").strip()[:80]
+            finally:
+                path.unlink(missing_ok=True)
+            action = "start" if path.name.startswith("experiment-start-") else "stop"
+            count = sum(recorder.manual_experiment(action, name) for recorder in self.recorders.values())
+            LOG.info("experiment %s '%s' sent to %d recorders", action, name, count)
 
     def step(self, now: float, discover: bool) -> None:
         kernel_events = self.kernel.read()
