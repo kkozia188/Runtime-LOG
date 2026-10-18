@@ -102,7 +102,7 @@ public:
       }
     }
     header_size_ = round_up(kFieldTableOffset + kFieldEntry * fields.size(), 4096);
-    slot_size_ = round_up(kSlotHeader + sizeof(double) * fields.size(), kCacheLine);
+    slot_size_ = static_cast<uint32_t>(round_up(kSlotHeader + sizeof(double) * fields.size(), kCacheLine));
     slot_count_ = slot_count;
     field_count_ = static_cast<uint32_t>(fields.size());
     size_ = header_size_ + static_cast<size_t>(slot_size_) * slot_count_;

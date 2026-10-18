@@ -1,0 +1,7 @@
+<library path="runtime_log_recorder">
+  <class name="runtime_log_recorder/RecorderController"
+         type="runtime_log_recorder::RecorderController"
+         base_class_type="controller_interface::ControllerInterface">
+    <description>Copies configured state interfaces into the Runtime-LOG shared-memory ring every cycle.</description>
+  </class>
+</library>
