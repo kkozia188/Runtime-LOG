@@ -1,0 +1,153 @@
+# Runtime-LOG profile for RT-Control (robot_driver) native scope runs, ROS 2 Humble.
+# Every pattern was taken from real launch.log files of the bench IPC (2026-10-17/18).
+# Patterns are matched against "[logger]: message" for ROS logger lines and the raw text otherwise.
+name: rt_control
+
+run:
+  # Which `ros2 launch` processes start a run (regex over the space-joined command line).
+  launch_match: 'ros2 launch rt_control_bringup \S+\.launch\.py'
+  artifact_arg: generated_dir
+  # Launch arguments read from the launch process command line.
+  scope_arg: control_scope
+  mock_arg: use_mock_hardware   # "false" = real hardware; the scope runtime defaults to mock
+  mock_default: true
+  # ros2_control_node --params-file <artifact>/controllers.yaml identifies the deployment artifact.
+  params_file_suffix: controllers.yaml
+  hardware_plugins:
+    mock: mock_components/GenericSystem
+    ethercat: ethercat_driver/EthercatDriver
+
+git_repos:
+  - ~/rt-control-electri127/robot_driver
+
+ethercat:
+  master: 0
+  startup_poll_hz: 5      # until the ready stage (+5 s), then steady
+  steady_poll_hz: 1
+  settle_s: 5
+
+# Stages in startup order. "controller" groups are reported in the controller table.
+stages:
+  - id: launch_started
+    label: launch 启动
+    source: launch
+    match: 'All log files can be found below'
+  - id: update_rate
+    label: 控制周期
+    match: '\[controller_manager\]: update rate is (?P<hz>\d+) Hz'
+  - id: rt_scheduling
+    label: RT 调度就绪
+    match: 'Successful set up FIFO RT scheduling policy with priority (?P<priority>\d+)'
+  - id: hardware_configuring
+    label: 硬件进入 unconfigured
+    match: "Setting component '(?P<hardware>[^']+)' to 'unconfigured' state"
+  - id: ecat_starting
+    label: EtherCAT 启动
+    match: '\[EthercatDriver\]: Starting \.\.\.please wait'
+  - id: ecat_rt_scope
+    label: 启动实时区段
+    match: 'EtherCAT startup realtime scope entered'
+  - id: ecat_master_active
+    label: 主站激活
+    match: 'Activated EcMaster'
+  - id: ecat_all_op
+    label: 全部从站 OP
+    match: 'All configured EtherCAT slaves are OP with a complete working counter'
+  - id: ecat_started
+    label: EtherCAT 启动完成
+    match: 'System Successfully started'
+  - id: ecat_handoff
+    label: 交接给周期线程
+    match: 'EtherCAT cyclic handoff maintenance started'
+  - id: hardware_active
+    label: 硬件激活
+    match: "Successful 'activate' of hardware '(?P<hardware>[^']+)'"
+  - id: hardware_active_disabled
+    label: 硬件激活（驱动未使能）
+    match: 'RT_SCOPE_HARDWARE_ACTIVE_DISABLED'
+  - id: controller_loading
+    label: 加载控制器
+    match: "\\[controller_manager\\]: Loading controller '(?P<controller>[^']+)'"
+  - id: controller_configuring
+    label: 配置控制器
+    match: "\\[controller_manager\\]: Configuring controller '(?P<controller>[^']+)'"
+  - id: controller_loaded_inactive
+    label: 控制器已加载
+    match: '\]: Loaded (?P<controller>\S+)$'
+  - id: controller_activated
+    label: 控制器激活
+    match: 'Configured and activated (?P<controller>\S+)'
+
+ready_stages:
+  - hardware_active_disabled
+  - controller_activated
+
+# First match decides the failed step.
+failures:
+  - id: preflight_rejected
+    stage: preflight
+    label: 启动前检查拒绝
+    source: launch
+    match: 'Caught exception in launch'
+  - id: activation_timeout
+    stage: hardware_activation
+    label: 从站未全部进 OP（激活超时）
+    match: 'Timed out waiting for all configured slaves OP'
+  - id: ecat_activation_failed
+    stage: hardware_activation
+    label: EtherCAT 激活失败
+    match: 'EtherCAT activation failed'
+  - id: hardware_activation_failed
+    stage: hardware_activation
+    label: 硬件激活失败
+    match: 'RuntimeError: hardware activation failed: (?P<hardware>\S+)'
+  - id: controller_failed
+    stage: controllers
+    label: 控制器加载/激活失败
+    match: 'Failed to (?:load|configure|activate|switch) controller'
+
+shutdown:
+  - id: ecat_stopping
+    label: 有序停止开始
+    match: '\[EthercatDriver\]: Stopping \.\.\.please wait'
+  - id: signal_received
+    label: 收到停止信号
+    match: 'signal_handler\(SIGINT/SIGTERM\)'
+  - id: shutdown_request
+    label: controller_manager 停止
+    match: 'Shutdown request received'
+
+controls:
+  - id: rt_enable
+    label: 使能
+    match: '/rt/enable accepted'
+  - id: rt_enable_rejected
+    label: 使能被拒绝
+    level: warn
+    match: '/rt/enable rejected'
+  - id: rt_disable
+    label: 失能
+    match: '/rt/disable accepted'
+  - id: goal_accepted
+    label: 轨迹目标
+    match: 'Accepted new action goal'
+  - id: goal_reached
+    label: 轨迹到达
+    match: 'Goal reached, success'
+  - id: goal_aborted
+    label: 轨迹中止
+    level: warn
+    match: 'Goal (?:was )?(?:aborted|canceled|rejected)'
+  - id: ecat_stopped
+    label: EtherCAT 已停止
+    match: 'System successfully stopped'
+  - id: hardware_deactivated
+    label: 硬件停用
+    match: "Successful '(?P<transition>deactivate|cleanup|shutdown)' of hardware '(?P<hardware>[^']+)'"
+
+process_order:
+  - ros2_control_node
+  - scope_hardware_start
+  - spawner
+  - control_enable_adapter
+  - scope_capabilities

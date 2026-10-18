@@ -1,0 +1,21 @@
+# systemd user unit. Install: deploy/install.sh (needs `loginctl enable-linger <user>` once).
+[Unit]
+Description=Runtime-LOG run recorder (passive, read-only) and index page on :18200
+After=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=%h/Runtime-LOG
+Environment=PYTHONUNBUFFERED=1
+# Extra arguments for `serve`, e.g. RUNTIME_LOG_SERVE_ARGS=--ethercat-hz 0 (see deploy/runtime-log.env).
+EnvironmentFile=-%h/.config/runtime-log.env
+ExecStart=/usr/bin/python3 -m runtime_log --archive %h/runtime-log/runs serve --host 0.0.0.0 --port 18200 $RUNTIME_LOG_SERVE_ARGS
+# Low priority; the process also removes isolated CPUs from its own affinity at start.
+Nice=10
+IOSchedulingClass=idle
+Restart=on-failure
+RestartSec=5
+TimeoutStopSec=15
+
+[Install]
+WantedBy=default.target

@@ -1,0 +1,91 @@
+1792257057.6069074 [INFO] [launch]: All log files can be found below /home/ar/.ros/log/2026-10-18-01-10-57-606495-ar-Default-string-165206
+1792257057.6069751 [INFO] [launch]: Default logging verbosity is set to INFO
+1792257058.1642098 [INFO] [ros2_control_node-1]: process started with pid [165233]
+1792257058.1643028 [INFO] [scope_hardware_start-2]: process started with pid [165235]
+1792257058.1804452 [ros2_control_node-1] [WARN] [1792257058.180302928] [controller_manager]: [Deprecated] Passing the robot description parameter directly to the control_manager node is deprecated. Use '~/robot_description' topic from 'robot_state_publisher' instead.
+1792257058.1806872 [ros2_control_node-1] [INFO] [1792257058.180641822] [resource_manager]: Loading hardware 'ecat_arms' 
+1792257058.1816094 [ros2_control_node-1] [INFO] [1792257058.181569108] [resource_manager]: Initialize hardware 'ecat_arms' 
+1792257058.1817784 [ros2_control_node-1] [INFO] [1792257058.181744192] [EthercatDriver]: joints
+1792257058.1831427 [ros2_control_node-1] [INFO] [1792257058.183096719] [EthercatDriver]: joints
+1792257058.1834474 [ros2_control_node-1] [INFO] [1792257058.183413618] [EthercatDriver]: joints
+1792257058.1837351 [ros2_control_node-1] [INFO] [1792257058.183704353] [EthercatDriver]: joints
+1792257058.1840875 [ros2_control_node-1] [INFO] [1792257058.184052027] [EthercatDriver]: joints
+1792257058.1844401 [ros2_control_node-1] [INFO] [1792257058.184408764] [EthercatDriver]: joints
+1792257058.1847341 [ros2_control_node-1] [INFO] [1792257058.184702267] [EthercatDriver]: joints
+1792257058.1850245 [ros2_control_node-1] [INFO] [1792257058.184985828] [EthercatDriver]: sensors
+1792257058.1850486 [ros2_control_node-1] [INFO] [1792257058.184990865] [EthercatDriver]: sensors
+1792257058.1851218 [ros2_control_node-1] [INFO] [1792257058.184993041] [EthercatDriver]: sensors
+1792257058.1851449 [ros2_control_node-1] [INFO] [1792257058.184996876] [EthercatDriver]: sensors
+1792257058.1851635 [ros2_control_node-1] [INFO] [1792257058.184998584] [EthercatDriver]: sensors
+1792257058.1851804 [ros2_control_node-1] [INFO] [1792257058.185000318] [EthercatDriver]: sensors
+1792257058.1851969 [ros2_control_node-1] [INFO] [1792257058.185001975] [EthercatDriver]: sensors
+1792257058.1852129 [ros2_control_node-1] [INFO] [1792257058.185003565] [EthercatDriver]: sensors
+1792257058.1852291 [ros2_control_node-1] [INFO] [1792257058.185005184] [EthercatDriver]: sensors
+1792257058.1852951 [ros2_control_node-1] [INFO] [1792257058.185049227] [EthercatDriver]: Got 7 modules
+1792257058.1853538 [ros2_control_node-1] [INFO] [1792257058.185089721] [resource_manager]: Successful initialization of hardware 'ecat_arms'
+1792257058.1853764 [ros2_control_node-1] [INFO] [1792257058.185189155] [controller_manager]: Setting component 'ecat_arms' to 'unconfigured' state.
+1792257058.2062519 [ros2_control_node-1] [INFO] [1792257058.206199016] [controller_manager]: update rate is 1000 Hz
+1792257058.2063327 [ros2_control_node-1] [INFO] [1792257058.206225205] [controller_manager]: Spawning controller_manager RT thread with scheduler priority: 80
+1792257058.2077439 [ros2_control_node-1] [INFO] [1792257058.207703396] [controller_manager]: Successful set up FIFO RT scheduling policy with priority 80.
+1792257058.2459240 [ros2_control_node-1] [INFO] [1792257058.245796030] [resource_manager]: 'configure' hardware 'ecat_arms' 
+1792257058.2460005 [ros2_control_node-1] [INFO] [1792257058.245808983] [resource_manager]: Successful 'configure' of hardware 'ecat_arms'
+1792257058.2460246 [ros2_control_node-1] [INFO] [1792257058.245815487] [resource_manager]: 'activate' hardware 'ecat_arms' 
+1792257058.2461312 [ros2_control_node-1] [INFO] [1792257058.245864718] [EthercatDriver]: Starting ...please wait...
+1792257058.2462306 [ros2_control_node-1] {0, 1, 0x5a65726f, 0x29252, 0x607a, 0x0}
+1792257058.2462618 [ros2_control_node-1] {0, 1, 0x5a65726f, 0x29252, 0x6040, 0x0}
+1792257058.2462823 [ros2_control_node-1] {0, 1, 0x5a65726f, 0x29252, 0x6064, 0x0}
+1792257058.2463000 [ros2_control_node-1] {0, 1, 0x5a65726f, 0x29252, 0x60fd, 0x0}
+1792257058.2463162 [ros2_control_node-1] {0, 1, 0x5a65726f, 0x29252, 0x6041, 0x0}
+1792257058.2463386 [ros2_control_node-1] {0, 2, 0x5a65726f, 0x29252, 0x607a, 0x0}
+1792257058.2463541 [ros2_control_node-1] {0, 2, 0x5a65726f, 0x29252, 0x6040, 0x0}
+1792257058.2463689 [ros2_control_node-1] {0, 2, 0x5a65726f, 0x29252, 0x6064, 0x0}
+1792257058.2463844 [ros2_control_node-1] {0, 2, 0x5a65726f, 0x29252, 0x60fd, 0x0}
+1792257058.2463994 [ros2_control_node-1] {0, 2, 0x5a65726f, 0x29252, 0x6041, 0x0}
+1792257058.2464736 [ros2_control_node-1] {0, 3, 0x5a65726f, 0x29252, 0x607a, 0x0}
+1792257058.2464986 [ros2_control_node-1] {0, 3, 0x5a65726f, 0x29252, 0x6040, 0x0}
+1792257058.2465184 [ros2_control_node-1] {0, 3, 0x5a65726f, 0x29252, 0x6064, 0x0}
+1792257058.2465358 [ros2_control_node-1] {0, 3, 0x5a65726f, 0x29252, 0x60fd, 0x0}
+1792257058.2465525 [ros2_control_node-1] {0, 3, 0x5a65726f, 0x29252, 0x6041, 0x0}
+1792257058.2465682 [ros2_control_node-1] {0, 4, 0x5a65726f, 0x29252, 0x607a, 0x0}
+1792257058.2465866 [ros2_control_node-1] {0, 4, 0x5a65726f, 0x29252, 0x6040, 0x0}
+1792257058.2466028 [ros2_control_node-1] {0, 4, 0x5a65726f, 0x29252, 0x6064, 0x0}
+1792257058.2466183 [ros2_control_node-1] {0, 4, 0x5a65726f, 0x29252, 0x60fd, 0x0}
+1792257058.2466333 [ros2_control_node-1] {0, 4, 0x5a65726f, 0x29252, 0x6041, 0x0}
+1792257058.2466486 [ros2_control_node-1] {0, 5, 0x5a65726f, 0x29252, 0x607a, 0x0}
+1792257058.2466640 [ros2_control_node-1] {0, 5, 0x5a65726f, 0x29252, 0x6040, 0x0}
+1792257058.2466836 [ros2_control_node-1] {0, 5, 0x5a65726f, 0x29252, 0x6064, 0x0}
+1792257058.2466984 [ros2_control_node-1] {0, 5, 0x5a65726f, 0x29252, 0x60fd, 0x0}
+1792257058.2467141 [ros2_control_node-1] {0, 5, 0x5a65726f, 0x29252, 0x6041, 0x0}
+1792257058.2467744 [ros2_control_node-1] {0, 6, 0x5a65726f, 0x29252, 0x607a, 0x0}
+1792257058.2467978 [ros2_control_node-1] {0, 6, 0x5a65726f, 0x29252, 0x6040, 0x0}
+1792257058.2468188 [ros2_control_node-1] {0, 6, 0x5a65726f, 0x29252, 0x6064, 0x0}
+1792257058.2468362 [ros2_control_node-1] {0, 6, 0x5a65726f, 0x29252, 0x60fd, 0x0}
+1792257058.2468526 [ros2_control_node-1] {0, 6, 0x5a65726f, 0x29252, 0x6041, 0x0}
+1792257058.2468688 [ros2_control_node-1] {0, 7, 0x5a65726f, 0x29252, 0x607a, 0x0}
+1792257058.2468903 [ros2_control_node-1] {0, 7, 0x5a65726f, 0x29252, 0x6040, 0x0}
+1792257058.2469063 [ros2_control_node-1] {0, 7, 0x5a65726f, 0x29252, 0x6064, 0x0}
+1792257058.2469223 [ros2_control_node-1] {0, 7, 0x5a65726f, 0x29252, 0x60fd, 0x0}
+1792257058.2469401 [ros2_control_node-1] {0, 7, 0x5a65726f, 0x29252, 0x6041, 0x0}
+1792257058.3302226 [ros2_control_node-1] [INFO] [1792257058.330167648] [EthercatDriver]: EtherCAT startup realtime scope entered
+1792257058.3312075 [ros2_control_node-1] [INFO] [1792257058.331176034] [EthercatDriver]: Activated EcMaster!
+1792257128.3313406 [ros2_control_node-1] [ERROR] [1792257128.331188092] [EthercatDriver]: Timed out waiting for all configured slaves OP and a complete working counter
+1792257128.3315029 [ros2_control_node-1] [INFO] [1792257128.331244615] [resource_manager]: Failed to 'activate' hardware 'ecat_arms'
+1792257128.3476646 [scope_hardware_start-2] Traceback (most recent call last):
+1792257128.3477187 [scope_hardware_start-2]   File "/home/ar/rt-control-electri127/install/lib/rt_control_bringup/scope_hardware_start", line 8, in <module>
+1792257128.3478205 [scope_hardware_start-2]     sys.exit(hardware_start_main())
+1792257128.3478448 [scope_hardware_start-2]   File "/home/ar/rt-control-electri127/install/local/lib/python3.10/dist-packages/rt_control_bringup/scope_lifecycle.py", line 325, in hardware_start_main
+1792257128.3478653 [scope_hardware_start-2]     activate_hardware(backend, lifecycle)
+1792257128.3478839 [scope_hardware_start-2]   File "/home/ar/rt-control-electri127/install/local/lib/python3.10/dist-packages/rt_control_bringup/scope_lifecycle.py", line 54, in activate_hardware
+1792257128.3478992 [scope_hardware_start-2]     raise RuntimeError(f"hardware activation failed: {name}")
+1792257128.3479140 [scope_hardware_start-2] RuntimeError: hardware activation failed: ecat_arms
+1792257128.4583838 [ERROR] [scope_hardware_start-2]: process has died [pid 165235, exit code 1, cmd '/home/ar/rt-control-electri127/install/lib/rt_control_bringup/scope_hardware_start /home/ar/rt-control-electri127/artifacts/bench_left_arm_motion --ros-args'].
+1792257128.4591150 [INFO] [ros2_control_node-1]: sending signal 'SIGINT' to process[ros2_control_node-1]
+1792257128.4592865 [ros2_control_node-1] [INFO] [1792257128.459202352] [rclcpp]: signal_handler(SIGINT/SIGTERM)
+1792257128.4593661 [ros2_control_node-1] [INFO] [1792257128.459254042] [controller_manager]: Shutdown request received....
+1792257128.4593894 [ros2_control_node-1] [INFO] [1792257128.459283768] [controller_manager]: Shutting down all controllers in the controller manager.
+1792257128.4594080 [ros2_control_node-1] [INFO] [1792257128.459294732] [resource_manager]: 'shutdown' hardware 'ecat_arms' 
+1792257128.4594243 [ros2_control_node-1] [INFO] [1792257128.459298364] [resource_manager]: Successful 'shutdown' of hardware 'ecat_arms'
+1792257128.4594390 [ros2_control_node-1] [INFO] [1792257128.459300304] [controller_manager]: Shutting down the controller manager.
+1792257128.4664085 [ros2_control_node-1] Warning: class_loader.ClassLoader: SEVERE WARNING!!! Attempting to unload library while objects created by this loader exist in the heap! You should delete your objects before attempting to unload the library or destroying the ClassLoader. The library will NOT be unloaded.
+1792257128.4664354 [ros2_control_node-1]          at line 127 in ./src/class_loader.cpp
+1792257128.5813320 [INFO] [ros2_control_node-1]: process has finished cleanly [pid 165233]

@@ -1,0 +1,134 @@
+1792232356.1976202 [INFO] [launch]: All log files can be found below /home/ar/.ros/log/2026-10-17-18-19-16-197235-ar-Default-string-89236
+1792232356.1976793 [INFO] [launch]: Default logging verbosity is set to INFO
+1792232356.7172713 [INFO] [ros2_control_node-1]: process started with pid [89284]
+1792232356.7173512 [INFO] [scope_hardware_start-2]: process started with pid [89286]
+1792232356.7306590 [ros2_control_node-1] [WARN] [1792232356.730570789] [controller_manager]: [Deprecated] Passing the robot description parameter directly to the control_manager node is deprecated. Use '~/robot_description' topic from 'robot_state_publisher' instead.
+1792232356.7307680 [ros2_control_node-1] [INFO] [1792232356.730668840] [resource_manager]: Loading hardware 'ecat_arms' 
+1792232356.7315271 [ros2_control_node-1] [INFO] [1792232356.731488958] [resource_manager]: Initialize hardware 'ecat_arms' 
+1792232356.7316618 [ros2_control_node-1] [INFO] [1792232356.731632247] [EthercatDriver]: joints
+1792232356.7328146 [ros2_control_node-1] [INFO] [1792232356.732777998] [EthercatDriver]: joints
+1792232356.7330670 [ros2_control_node-1] [INFO] [1792232356.733037590] [EthercatDriver]: joints
+1792232356.7332754 [ros2_control_node-1] [INFO] [1792232356.733247121] [EthercatDriver]: joints
+1792232356.7334855 [ros2_control_node-1] [INFO] [1792232356.733458037] [EthercatDriver]: joints
+1792232356.7336948 [ros2_control_node-1] [INFO] [1792232356.733666317] [EthercatDriver]: joints
+1792232356.7338939 [ros2_control_node-1] [INFO] [1792232356.733867037] [EthercatDriver]: joints
+1792232356.7341008 [ros2_control_node-1] [INFO] [1792232356.734068737] [EthercatDriver]: sensors
+1792232356.7341216 [ros2_control_node-1] [INFO] [1792232356.734072378] [EthercatDriver]: sensors
+1792232356.7341847 [ros2_control_node-1] [INFO] [1792232356.734074284] [EthercatDriver]: sensors
+1792232356.7342052 [ros2_control_node-1] [INFO] [1792232356.734076289] [EthercatDriver]: sensors
+1792232356.7342224 [ros2_control_node-1] [INFO] [1792232356.734077849] [EthercatDriver]: sensors
+1792232356.7342374 [ros2_control_node-1] [INFO] [1792232356.734079354] [EthercatDriver]: sensors
+1792232356.7342520 [ros2_control_node-1] [INFO] [1792232356.734080832] [EthercatDriver]: sensors
+1792232356.7342663 [ros2_control_node-1] [INFO] [1792232356.734082296] [EthercatDriver]: sensors
+1792232356.7342811 [ros2_control_node-1] [INFO] [1792232356.734083713] [EthercatDriver]: sensors
+1792232356.7343378 [ros2_control_node-1] [INFO] [1792232356.734117947] [EthercatDriver]: Got 7 modules
+1792232356.7343588 [ros2_control_node-1] [INFO] [1792232356.734151140] [resource_manager]: Successful initialization of hardware 'ecat_arms'
+1792232356.7344081 [ros2_control_node-1] [INFO] [1792232356.734229104] [controller_manager]: Setting component 'ecat_arms' to 'unconfigured' state.
+1792232356.7529881 [ros2_control_node-1] [INFO] [1792232356.752862834] [controller_manager]: update rate is 250 Hz
+1792232356.7530594 [ros2_control_node-1] [INFO] [1792232356.752887802] [controller_manager]: Spawning controller_manager RT thread with scheduler priority: 80
+1792232356.7542226 [ros2_control_node-1] [INFO] [1792232356.754176229] [controller_manager]: Successful set up FIFO RT scheduling policy with priority 80.
+1792232356.7872159 [ros2_control_node-1] [INFO] [1792232356.787133550] [resource_manager]: 'configure' hardware 'ecat_arms' 
+1792232356.7872720 [ros2_control_node-1] [INFO] [1792232356.787151001] [resource_manager]: Successful 'configure' of hardware 'ecat_arms'
+1792232356.7873631 [ros2_control_node-1] [INFO] [1792232356.787159217] [resource_manager]: 'activate' hardware 'ecat_arms' 
+1792232356.7874224 [ros2_control_node-1] [INFO] [1792232356.787233840] [EthercatDriver]: Starting ...please wait...
+1792232356.7876532 [ros2_control_node-1] {0, 1, 0x5a65726f, 0x29252, 0x607a, 0x0}
+1792232356.7876797 [ros2_control_node-1] {0, 1, 0x5a65726f, 0x29252, 0x6040, 0x0}
+1792232356.7876968 [ros2_control_node-1] {0, 1, 0x5a65726f, 0x29252, 0x6064, 0x0}
+1792232356.7877123 [ros2_control_node-1] {0, 1, 0x5a65726f, 0x29252, 0x60fd, 0x0}
+1792232356.7877314 [ros2_control_node-1] {0, 1, 0x5a65726f, 0x29252, 0x6041, 0x0}
+1792232356.7878001 [ros2_control_node-1] {0, 2, 0x5a65726f, 0x29252, 0x607a, 0x0}
+1792232356.7878201 [ros2_control_node-1] {0, 2, 0x5a65726f, 0x29252, 0x6040, 0x0}
+1792232356.7878370 [ros2_control_node-1] {0, 2, 0x5a65726f, 0x29252, 0x6064, 0x0}
+1792232356.7878523 [ros2_control_node-1] {0, 2, 0x5a65726f, 0x29252, 0x60fd, 0x0}
+1792232356.7878664 [ros2_control_node-1] {0, 2, 0x5a65726f, 0x29252, 0x6041, 0x0}
+1792232356.7878802 [ros2_control_node-1] {0, 3, 0x5a65726f, 0x29252, 0x607a, 0x0}
+1792232356.7878942 [ros2_control_node-1] {0, 3, 0x5a65726f, 0x29252, 0x6040, 0x0}
+1792232356.7879081 [ros2_control_node-1] {0, 3, 0x5a65726f, 0x29252, 0x6064, 0x0}
+1792232356.7879212 [ros2_control_node-1] {0, 3, 0x5a65726f, 0x29252, 0x60fd, 0x0}
+1792232356.7879391 [ros2_control_node-1] {0, 3, 0x5a65726f, 0x29252, 0x6041, 0x0}
+1792232356.7879529 [ros2_control_node-1] {0, 4, 0x5a65726f, 0x29252, 0x607a, 0x0}
+1792232356.7879682 [ros2_control_node-1] {0, 4, 0x5a65726f, 0x29252, 0x6040, 0x0}
+1792232356.7879813 [ros2_control_node-1] {0, 4, 0x5a65726f, 0x29252, 0x6064, 0x0}
+1792232356.7879937 [ros2_control_node-1] {0, 4, 0x5a65726f, 0x29252, 0x60fd, 0x0}
+1792232356.7880065 [ros2_control_node-1] {0, 4, 0x5a65726f, 0x29252, 0x6041, 0x0}
+1792232356.7880197 [ros2_control_node-1] {0, 5, 0x5a65726f, 0x29252, 0x607a, 0x0}
+1792232356.7880328 [ros2_control_node-1] {0, 5, 0x5a65726f, 0x29252, 0x6040, 0x0}
+1792232356.7880456 [ros2_control_node-1] {0, 5, 0x5a65726f, 0x29252, 0x6064, 0x0}
+1792232356.7880585 [ros2_control_node-1] {0, 5, 0x5a65726f, 0x29252, 0x60fd, 0x0}
+1792232356.7880719 [ros2_control_node-1] {0, 5, 0x5a65726f, 0x29252, 0x6041, 0x0}
+1792232356.7881289 [ros2_control_node-1] {0, 6, 0x5a65726f, 0x29252, 0x607a, 0x0}
+1792232356.7881484 [ros2_control_node-1] {0, 6, 0x5a65726f, 0x29252, 0x6040, 0x0}
+1792232356.7881649 [ros2_control_node-1] {0, 6, 0x5a65726f, 0x29252, 0x6064, 0x0}
+1792232356.7881799 [ros2_control_node-1] {0, 6, 0x5a65726f, 0x29252, 0x60fd, 0x0}
+1792232356.7881937 [ros2_control_node-1] {0, 6, 0x5a65726f, 0x29252, 0x6041, 0x0}
+1792232356.7882075 [ros2_control_node-1] {0, 7, 0x5a65726f, 0x29252, 0x607a, 0x0}
+1792232356.7882214 [ros2_control_node-1] {0, 7, 0x5a65726f, 0x29252, 0x6040, 0x0}
+1792232356.7882345 [ros2_control_node-1] {0, 7, 0x5a65726f, 0x29252, 0x6064, 0x0}
+1792232356.7882476 [ros2_control_node-1] {0, 7, 0x5a65726f, 0x29252, 0x60fd, 0x0}
+1792232356.7882617 [ros2_control_node-1] {0, 7, 0x5a65726f, 0x29252, 0x6041, 0x0}
+1792232356.8154402 [ros2_control_node-1] [INFO] [1792232356.815341857] [EthercatDriver]: EtherCAT startup realtime scope entered
+1792232356.8164232 [ros2_control_node-1] [INFO] [1792232356.816340505] [EthercatDriver]: Activated EcMaster!
+1792232381.9804904 [ros2_control_node-1] [INFO] [1792232381.980352940] [EthercatDriver]: All configured EtherCAT slaves are OP with a complete working counter
+1792232381.9844122 [ros2_control_node-1] [INFO] [1792232381.984355907] [EthercatDriver]: System Successfully started!
+1792232381.9845085 [ros2_control_node-1] [INFO] [1792232381.984375671] [EthercatDriver]: EtherCAT startup realtime scope restored
+1792232381.9864116 [ros2_control_node-1] [INFO] [1792232381.986357310] [EthercatDriver]: EtherCAT cyclic handoff maintenance started
+1792232381.9864831 [ros2_control_node-1] [INFO] [1792232381.986375525] [resource_manager]: Successful 'activate' of hardware 'ecat_arms'
+1792232381.9866347 [scope_hardware_start-2] RT_SCOPE_HARDWARE_ACTIVE_DISABLED
+1792232382.0966961 [INFO] [scope_hardware_start-2]: process has finished cleanly [pid 89286]
+1792232382.0976303 [INFO] [spawner-3]: process started with pid [90344]
+1792232382.2158008 [spawner-3] [INFO] [1792232382.215504242] [spawner_joint_state_broadcaster]: waiting for service /controller_manager/list_controllers to become available...
+1792232382.4671736 [ros2_control_node-1] [INFO] [1792232382.467035028] [controller_manager]: Loading controller 'joint_state_broadcaster'
+1792232382.4731932 [spawner-3] [INFO] [1792232382.473120813] [spawner_joint_state_broadcaster]: [94mLoaded [1mjoint_state_broadcaster[0m
+1792232382.4734473 [ros2_control_node-1] [INFO] [1792232382.473401927] [controller_manager]: Configuring controller 'joint_state_broadcaster'
+1792232382.4736817 [ros2_control_node-1] [INFO] [1792232382.473647486] [joint_state_broadcaster]: 'joints' or 'interfaces' parameter is empty. All available state interfaces will be published
+1792232382.4893284 [spawner-3] [INFO] [1792232382.489200791] [spawner_joint_state_broadcaster]: [92mConfigured and activated [1mjoint_state_broadcaster[0m
+1792232382.4895055 [ros2_control_node-1] [INFO] [1792232382.489458261] [controller_manager]: Loading controller 'rt_internal_state_broadcaster'
+1792232382.4931197 [spawner-3] [INFO] [1792232382.493049361] [spawner_joint_state_broadcaster]: [94mLoaded [1mrt_internal_state_broadcaster[0m
+1792232382.4932375 [ros2_control_node-1] [INFO] [1792232382.493116200] [controller_manager]: Configuring controller 'rt_internal_state_broadcaster'
+1792232382.4932666 [ros2_control_node-1] [INFO] [1792232382.493133675] [rt_internal_state_broadcaster]: 'joints' or 'interfaces' parameter is empty. All available state interfaces will be published
+1792232382.5051458 [spawner-3] [INFO] [1792232382.505101286] [spawner_joint_state_broadcaster]: [92mConfigured and activated [1mrt_internal_state_broadcaster[0m
+1792232382.5053837 [ros2_control_node-1] [INFO] [1792232382.505345036] [controller_manager]: Loading controller 'enable_manager'
+1792232382.5130801 [spawner-3] [INFO] [1792232382.513042341] [spawner_joint_state_broadcaster]: [94mLoaded [1menable_manager[0m
+1792232382.5131683 [ros2_control_node-1] [INFO] [1792232382.513104173] [controller_manager]: Configuring controller 'enable_manager'
+1792232382.5251899 [spawner-3] [INFO] [1792232382.525151115] [spawner_joint_state_broadcaster]: [92mConfigured and activated [1menable_manager[0m
+1792232382.6438048 [INFO] [spawner-3]: process has finished cleanly [pid 90344]
+1792232382.6451170 [INFO] [control_enable_adapter-4]: process started with pid [90398]
+1792232382.6451867 [INFO] [scope_capabilities-5]: process started with pid [90400]
+1792235042.5334725 [ros2_control_node-1] [INFO] [1792235042.533312427] [resource_manager]: 'deactivate' hardware 'ecat_arms' 
+1792235042.5335555 [ros2_control_node-1] [INFO] [1792235042.533343016] [EthercatDriver]: Stopping ...please wait...
+1792235042.5544169 [ros2_control_node-1] [INFO] [1792235042.554358931] [EthercatDriver]: System successfully stopped!
+1792235042.5544937 [ros2_control_node-1] [INFO] [1792235042.554371653] [resource_manager]: Successful 'deactivate' of hardware 'ecat_arms'
+1792235042.5547552 [ros2_control_node-1] [INFO] [1792235042.554716590] [resource_manager]: 'cleanup' hardware 'ecat_arms' 
+1792235042.5547776 [ros2_control_node-1] [INFO] [1792235042.554722201] [resource_manager]: Successful 'cleanup' of hardware 'ecat_arms'
+1792235042.6739876 [ros2_control_node-1] [INFO] [1792235042.673768339] [rclcpp]: signal_handler(SIGINT/SIGTERM)
+1792235042.6741929 [ros2_control_node-1] [INFO] [1792235042.673852966] [controller_manager]: Shutdown request received....
+1792235042.6742213 [ros2_control_node-1] [INFO] [1792235042.673893891] [controller_manager]: Shutting down all controllers in the controller manager.
+1792235042.6742420 [ros2_control_node-1] [INFO] [1792235042.673910325] [controller_manager]: Shutting down controller 'joint_state_broadcaster'
+1792235042.6742594 [ros2_control_node-1] [INFO] [1792235042.673952204] [controller_manager]: Shutting down controller 'rt_internal_state_broadcaster'
+1792235042.6742756 [ros2_control_node-1] [INFO] [1792235042.673971760] [controller_manager]: Shutting down controller 'enable_manager'
+1792235042.6742911 [ros2_control_node-1] [INFO] [1792235042.673996941] [resource_manager]: 'shutdown' hardware 'ecat_arms' 
+1792235042.6743062 [ros2_control_node-1] [INFO] [1792235042.674004070] [resource_manager]: Successful 'shutdown' of hardware 'ecat_arms'
+1792235042.6743209 [ros2_control_node-1] [INFO] [1792235042.674007899] [controller_manager]: Shutting down the controller manager.
+1792235042.6927760 [scope_capabilities-5] Traceback (most recent call last):
+1792235042.6928484 [scope_capabilities-5]   File "/home/ar/rt-control-electri127/install/lib/rt_control_bringup/scope_capabilities", line 8, in <module>
+1792235042.6929669 [scope_capabilities-5]     sys.exit(capabilities_main())
+1792235042.6929905 [scope_capabilities-5]   File "/home/ar/rt-control-electri127/install/local/lib/python3.10/dist-packages/rt_control_bringup/scope_lifecycle.py", line 223, in capabilities_main
+1792235042.6930091 [scope_capabilities-5]     rclpy.spin(node)
+1792235042.6930442 [scope_capabilities-5]   File "/opt/ros/humble/local/lib/python3.10/dist-packages/rclpy/__init__.py", line 229, in spin
+1792235042.6931243 [ros2_control_node-1] Warning: class_loader.ClassLoader: SEVERE WARNING!!! Attempting to unload library while objects created by this loader exist in the heap! You should delete your objects before attempting to unload the library or destroying the ClassLoader. The library will NOT be unloaded.
+1792235042.6931469 [ros2_control_node-1]          at line 127 in ./src/class_loader.cpp
+1792235042.6931975 [scope_capabilities-5]     executor.spin_once()
+1792235042.6932173 [scope_capabilities-5]   File "/opt/ros/humble/local/lib/python3.10/dist-packages/rclpy/executors.py", line 808, in spin_once
+1792235042.6936224 [scope_capabilities-5]     self._spin_once_impl(timeout_sec)
+1792235042.6936438 [scope_capabilities-5]   File "/opt/ros/humble/local/lib/python3.10/dist-packages/rclpy/executors.py", line 797, in _spin_once_impl
+1792235042.6937127 [scope_capabilities-5]     handler, entity, node = self.wait_for_ready_callbacks(timeout_sec=timeout_sec)
+1792235042.6937332 [scope_capabilities-5]   File "/opt/ros/humble/local/lib/python3.10/dist-packages/rclpy/executors.py", line 780, in wait_for_ready_callbacks
+1792235042.6937959 [scope_capabilities-5]     return next(self._cb_iter)
+1792235042.6938157 [scope_capabilities-5]   File "/opt/ros/humble/local/lib/python3.10/dist-packages/rclpy/executors.py", line 681, in _wait_for_ready_callbacks
+1792235042.6938322 [scope_capabilities-5]     raise ExternalShutdownException()
+1792235042.6938481 [scope_capabilities-5] rclpy.executors.ExternalShutdownException
+1792235042.7890675 [INFO] [control_enable_adapter-4]: process has finished cleanly [pid 90398]
+1792235042.7898366 [INFO] [scope_capabilities-5]: sending signal 'SIGINT' to process[scope_capabilities-5]
+1792235042.7902064 [INFO] [ros2_control_node-1]: sending signal 'SIGINT' to process[ros2_control_node-1]
+1792235042.8048937 [ERROR] [scope_capabilities-5]: process has died [pid 90400, exit code 1, cmd '/home/ar/rt-control-electri127/install/lib/rt_control_bringup/scope_capabilities /home/ar/rt-control-electri127/artifacts/bench_left_arm --ros-args'].
+1792235042.8104632 [INFO] [ros2_control_node-1]: process has finished cleanly [pid 89284]

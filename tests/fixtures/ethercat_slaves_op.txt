@@ -1,0 +1,9 @@
+0  2:0  OP     +  GR10-EC-6SW(IN,X2,X3)_1.4.2.0
+1  2:1  OP     +  ZeroErr Driver
+2  2:2  OP     +  ZeroErr Driver
+3  2:3  OP     +  ZeroErr Driver
+4  2:4  OP     +  ZeroErr Driver
+5  2:5  OP     +  ZeroErr Driver
+6  2:6  OP     +  ZeroErr Driver
+7  2:7  OP     +  ZeroErr Driver
+8  7:0  PREOP  +  GR10-EC-6SW(X4,X5,X6)_1.4.2.0

@@ -1,0 +1,231 @@
+1792306068.1272047 [INFO] [launch]: All log files can be found below /home/ar/.ros/log/2026-10-18-14-47-48-126798-ar-Default-string-235346
+1792306068.1272666 [INFO] [launch]: Default logging verbosity is set to INFO
+1792306068.6345289 [INFO] [ros2_control_node-1]: process started with pid [235371]
+1792306068.6346102 [INFO] [scope_hardware_start-2]: process started with pid [235373]
+1792306068.6475370 [ros2_control_node-1] [WARN] [1792306068.647415770] [controller_manager]: [Deprecated] Passing the robot description parameter directly to the control_manager node is deprecated. Use '~/robot_description' topic from 'robot_state_publisher' instead.
+1792306068.6477509 [ros2_control_node-1] [INFO] [1792306068.647707781] [resource_manager]: Loading hardware 'ecat_arms' 
+1792306068.6485500 [ros2_control_node-1] [INFO] [1792306068.648514995] [resource_manager]: Initialize hardware 'ecat_arms' 
+1792306068.6486905 [ros2_control_node-1] [INFO] [1792306068.648660673] [EthercatDriver]: joints
+1792306068.6498921 [ros2_control_node-1] [INFO] [1792306068.649853452] [EthercatDriver]: joints
+1792306068.6501665 [ros2_control_node-1] [INFO] [1792306068.650136797] [EthercatDriver]: joints
+1792306068.6504140 [ros2_control_node-1] [INFO] [1792306068.650387016] [EthercatDriver]: joints
+1792306068.6506660 [ros2_control_node-1] [INFO] [1792306068.650639644] [EthercatDriver]: joints
+1792306068.6509113 [ros2_control_node-1] [INFO] [1792306068.650885135] [EthercatDriver]: joints
+1792306068.6511559 [ros2_control_node-1] [INFO] [1792306068.651129893] [EthercatDriver]: joints
+1792306068.6514001 [ros2_control_node-1] [INFO] [1792306068.651369302] [EthercatDriver]: sensors
+1792306068.6514211 [ros2_control_node-1] [INFO] [1792306068.651373220] [EthercatDriver]: sensors
+1792306068.6514864 [ros2_control_node-1] [INFO] [1792306068.651375054] [EthercatDriver]: sensors
+1792306068.6515064 [ros2_control_node-1] [INFO] [1792306068.651376606] [EthercatDriver]: sensors
+1792306068.6515234 [ros2_control_node-1] [INFO] [1792306068.651378103] [EthercatDriver]: sensors
+1792306068.6515384 [ros2_control_node-1] [INFO] [1792306068.651379628] [EthercatDriver]: sensors
+1792306068.6515527 [ros2_control_node-1] [INFO] [1792306068.651381103] [EthercatDriver]: sensors
+1792306068.6515663 [ros2_control_node-1] [INFO] [1792306068.651382530] [EthercatDriver]: sensors
+1792306068.6515806 [ros2_control_node-1] [INFO] [1792306068.651383974] [EthercatDriver]: sensors
+1792306068.6516404 [ros2_control_node-1] [INFO] [1792306068.651418568] [EthercatDriver]: Got 7 modules
+1792306068.6516962 [ros2_control_node-1] [INFO] [1792306068.651452396] [resource_manager]: Successful initialization of hardware 'ecat_arms'
+1792306068.6517460 [ros2_control_node-1] [INFO] [1792306068.651537148] [controller_manager]: Setting component 'ecat_arms' to 'unconfigured' state.
+1792306068.6694582 [ros2_control_node-1] [INFO] [1792306068.669398378] [controller_manager]: update rate is 1000 Hz
+1792306068.6695478 [ros2_control_node-1] [INFO] [1792306068.669420784] [controller_manager]: Spawning controller_manager RT thread with scheduler priority: 80
+1792306068.6707735 [ros2_control_node-1] [INFO] [1792306068.670738614] [controller_manager]: Successful set up FIFO RT scheduling policy with priority 80.
+1792306068.9558339 [ros2_control_node-1] [INFO] [1792306068.955704175] [resource_manager]: 'configure' hardware 'ecat_arms' 
+1792306068.9559033 [ros2_control_node-1] [INFO] [1792306068.955722478] [resource_manager]: Successful 'configure' of hardware 'ecat_arms'
+1792306068.9559243 [ros2_control_node-1] [INFO] [1792306068.955731724] [resource_manager]: 'activate' hardware 'ecat_arms' 
+1792306068.9560320 [ros2_control_node-1] [INFO] [1792306068.955803421] [EthercatDriver]: Starting ...please wait...
+1792306068.9562340 [ros2_control_node-1] {0, 1, 0x5a65726f, 0x29252, 0x607a, 0x0}
+1792306068.9562571 [ros2_control_node-1] {0, 1, 0x5a65726f, 0x29252, 0x6040, 0x0}
+1792306068.9562757 [ros2_control_node-1] {0, 1, 0x5a65726f, 0x29252, 0x6064, 0x0}
+1792306068.9562922 [ros2_control_node-1] {0, 1, 0x5a65726f, 0x29252, 0x60fd, 0x0}
+1792306068.9563072 [ros2_control_node-1] {0, 1, 0x5a65726f, 0x29252, 0x6041, 0x0}
+1792306068.9563770 [ros2_control_node-1] {0, 2, 0x5a65726f, 0x29252, 0x607a, 0x0}
+1792306068.9563982 [ros2_control_node-1] {0, 2, 0x5a65726f, 0x29252, 0x6040, 0x0}
+1792306068.9564159 [ros2_control_node-1] {0, 2, 0x5a65726f, 0x29252, 0x6064, 0x0}
+1792306068.9564323 [ros2_control_node-1] {0, 2, 0x5a65726f, 0x29252, 0x60fd, 0x0}
+1792306068.9564466 [ros2_control_node-1] {0, 2, 0x5a65726f, 0x29252, 0x6041, 0x0}
+1792306068.9564605 [ros2_control_node-1] {0, 3, 0x5a65726f, 0x29252, 0x607a, 0x0}
+1792306068.9564741 [ros2_control_node-1] {0, 3, 0x5a65726f, 0x29252, 0x6040, 0x0}
+1792306068.9564877 [ros2_control_node-1] {0, 3, 0x5a65726f, 0x29252, 0x6064, 0x0}
+1792306068.9565012 [ros2_control_node-1] {0, 3, 0x5a65726f, 0x29252, 0x60fd, 0x0}
+1792306068.9565148 [ros2_control_node-1] {0, 3, 0x5a65726f, 0x29252, 0x6041, 0x0}
+1792306068.9565282 [ros2_control_node-1] {0, 4, 0x5a65726f, 0x29252, 0x607a, 0x0}
+1792306068.9565434 [ros2_control_node-1] {0, 4, 0x5a65726f, 0x29252, 0x6040, 0x0}
+1792306068.9565566 [ros2_control_node-1] {0, 4, 0x5a65726f, 0x29252, 0x6064, 0x0}
+1792306068.9565697 [ros2_control_node-1] {0, 4, 0x5a65726f, 0x29252, 0x60fd, 0x0}
+1792306068.9565825 [ros2_control_node-1] {0, 4, 0x5a65726f, 0x29252, 0x6041, 0x0}
+1792306068.9565957 [ros2_control_node-1] {0, 5, 0x5a65726f, 0x29252, 0x607a, 0x0}
+1792306068.9566085 [ros2_control_node-1] {0, 5, 0x5a65726f, 0x29252, 0x6040, 0x0}
+1792306068.9566262 [ros2_control_node-1] {0, 5, 0x5a65726f, 0x29252, 0x6064, 0x0}
+1792306068.9566393 [ros2_control_node-1] {0, 5, 0x5a65726f, 0x29252, 0x60fd, 0x0}
+1792306068.9566531 [ros2_control_node-1] {0, 5, 0x5a65726f, 0x29252, 0x6041, 0x0}
+1792306068.9567091 [ros2_control_node-1] {0, 6, 0x5a65726f, 0x29252, 0x607a, 0x0}
+1792306068.9567294 [ros2_control_node-1] {0, 6, 0x5a65726f, 0x29252, 0x6040, 0x0}
+1792306068.9567461 [ros2_control_node-1] {0, 6, 0x5a65726f, 0x29252, 0x6064, 0x0}
+1792306068.9567614 [ros2_control_node-1] {0, 6, 0x5a65726f, 0x29252, 0x60fd, 0x0}
+1792306068.9567759 [ros2_control_node-1] {0, 6, 0x5a65726f, 0x29252, 0x6041, 0x0}
+1792306068.9567904 [ros2_control_node-1] {0, 7, 0x5a65726f, 0x29252, 0x607a, 0x0}
+1792306068.9568048 [ros2_control_node-1] {0, 7, 0x5a65726f, 0x29252, 0x6040, 0x0}
+1792306068.9568183 [ros2_control_node-1] {0, 7, 0x5a65726f, 0x29252, 0x6064, 0x0}
+1792306068.9568329 [ros2_control_node-1] {0, 7, 0x5a65726f, 0x29252, 0x60fd, 0x0}
+1792306068.9568465 [ros2_control_node-1] {0, 7, 0x5a65726f, 0x29252, 0x6041, 0x0}
+1792306069.0398791 [ros2_control_node-1] [INFO] [1792306069.039845995] [EthercatDriver]: EtherCAT startup realtime scope entered
+1792306069.0408752 [ros2_control_node-1] [INFO] [1792306069.040845278] [EthercatDriver]: Activated EcMaster!
+1792306073.4420040 [ros2_control_node-1] [INFO] [1792306073.441857505] [EthercatDriver]: All configured EtherCAT slaves are OP with a complete working counter
+1792306073.4429023 [ros2_control_node-1] [INFO] [1792306073.442861501] [EthercatDriver]: System Successfully started!
+1792306073.4429910 [ros2_control_node-1] [INFO] [1792306073.442882438] [EthercatDriver]: EtherCAT startup realtime scope restored
+1792306073.4443128 [ros2_control_node-1] [INFO] [1792306073.444258586] [EthercatDriver]: EtherCAT cyclic handoff maintenance started
+1792306073.4445217 [ros2_control_node-1] [INFO] [1792306073.444273295] [resource_manager]: Successful 'activate' of hardware 'ecat_arms'
+1792306073.4446051 [scope_hardware_start-2] RT_SCOPE_HARDWARE_ACTIVE_DISABLED
+1792306073.5546982 [INFO] [scope_hardware_start-2]: process has finished cleanly [pid 235373]
+1792306073.5555272 [INFO] [spawner-3]: process started with pid [235606]
+1792306073.6724498 [spawner-3] [INFO] [1792306073.672185967] [spawner_left_arm_jtc]: waiting for service /controller_manager/list_controllers to become available...
+1792306073.9237647 [ros2_control_node-1] [INFO] [1792306073.923648771] [controller_manager]: Loading controller 'left_arm_jtc'
+1792306073.9287186 [ros2_control_node-1] [WARN] [1792306073.928669153] [left_arm_jtc]: [Deprecated]: "allow_nonzero_velocity_at_trajectory_end" is set to true. The default behavior will change to false.
+1792306073.9292903 [spawner-3] [INFO] [1792306073.929253474] [spawner_left_arm_jtc]: [94mLoaded [1mleft_arm_jtc[0m
+1792306073.9295330 [ros2_control_node-1] [INFO] [1792306073.929501691] [controller_manager]: Configuring controller 'left_arm_jtc'
+1792306073.9296637 [ros2_control_node-1] [INFO] [1792306073.929633610] [left_arm_jtc]: No specific joint names are used for command interfaces. Using 'joints' parameter.
+1792306073.9297554 [ros2_control_node-1] [INFO] [1792306073.929725529] [left_arm_jtc]: Command interfaces are [position] and state interfaces are [position].
+1792306073.9298220 [ros2_control_node-1] [INFO] [1792306073.929772217] [left_arm_jtc]: Using 'splines' interpolation method.
+1792306073.9298894 [ros2_control_node-1] [INFO] [1792306073.929819135] [left_arm_jtc]: JTC_TOPIC_COMMAND_DISABLED reason=trajectory_start_consistency_check_enabled command_interface=follow_joint_trajectory_action
+1792306073.9299111 [ros2_control_node-1] [INFO] [1792306073.929821857] [left_arm_jtc]: Controller state will be published at 50.00 Hz.
+1792306073.9342659 [ros2_control_node-1] [INFO] [1792306073.934170716] [left_arm_jtc]: Action status changes will be monitored at 20.00 Hz.
+1792306074.0514419 [INFO] [spawner-3]: process has finished cleanly [pid 235606]
+1792306074.0522521 [INFO] [spawner-4]: process started with pid [235658]
+1792306074.1706858 [spawner-4] [INFO] [1792306074.170378556] [spawner_joint_state_broadcaster]: waiting for service /controller_manager/list_controllers to become available...
+1792306074.4220829 [ros2_control_node-1] [INFO] [1792306074.421986368] [controller_manager]: Loading controller 'joint_state_broadcaster'
+1792306074.4262686 [spawner-4] [INFO] [1792306074.426222736] [spawner_joint_state_broadcaster]: [94mLoaded [1mjoint_state_broadcaster[0m
+1792306074.4265101 [ros2_control_node-1] [INFO] [1792306074.426472356] [controller_manager]: Configuring controller 'joint_state_broadcaster'
+1792306074.4265811 [ros2_control_node-1] [INFO] [1792306074.426505884] [joint_state_broadcaster]: Publishing state interfaces defined in 'joints' and 'interfaces' parameters.
+1792306074.4266038 [ros2_control_node-1] [WARN] [1792306074.426529116] [joint_state_broadcaster]: Mapping from 'position' to interface 'position' will not be done, because 'position' is defined in 'interface' parameter.
+1792306074.4313159 [spawner-4] [INFO] [1792306074.431227093] [spawner_joint_state_broadcaster]: [92mConfigured and activated [1mjoint_state_broadcaster[0m
+1792306074.4315555 [ros2_control_node-1] [INFO] [1792306074.431510099] [controller_manager]: Loading controller 'rt_internal_state_broadcaster'
+1792306074.4352822 [spawner-4] [INFO] [1792306074.435248470] [spawner_joint_state_broadcaster]: [94mLoaded [1mrt_internal_state_broadcaster[0m
+1792306074.4353638 [ros2_control_node-1] [INFO] [1792306074.435305235] [controller_manager]: Configuring controller 'rt_internal_state_broadcaster'
+1792306074.4354308 [ros2_control_node-1] [INFO] [1792306074.435337096] [rt_internal_state_broadcaster]: 'joints' or 'interfaces' parameter is empty. All available state interfaces will be published
+1792306074.4421875 [spawner-4] [INFO] [1792306074.442133199] [spawner_joint_state_broadcaster]: [92mConfigured and activated [1mrt_internal_state_broadcaster[0m
+1792306074.4424751 [ros2_control_node-1] [INFO] [1792306074.442436003] [controller_manager]: Loading controller 'enable_manager'
+1792306074.4493399 [spawner-4] [INFO] [1792306074.449278703] [spawner_joint_state_broadcaster]: [94mLoaded [1menable_manager[0m
+1792306074.4494414 [ros2_control_node-1] [INFO] [1792306074.449337389] [controller_manager]: Configuring controller 'enable_manager'
+1792306074.4541674 [spawner-4] [INFO] [1792306074.454129600] [spawner_joint_state_broadcaster]: [92mConfigured and activated [1menable_manager[0m
+1792306074.5698125 [INFO] [spawner-4]: process has finished cleanly [pid 235658]
+1792306074.5711205 [INFO] [control_enable_adapter-5]: process started with pid [235709]
+1792306074.5711973 [INFO] [scope_capabilities-6]: process started with pid [235711]
+1792306572.6034658 [control_enable_adapter-5] [INFO] [1792306572.603321491] [control_enable_adapter]: /rt/enable accepted: ok=True, stage=success
+1792306637.9961445 [control_enable_adapter-5] [INFO] [1792306637.996008373] [control_enable_adapter]: /rt/disable accepted: ok=True, stage=success
+1792309524.4081063 [control_enable_adapter-5] [INFO] [1792309524.407973622] [control_enable_adapter]: /rt/enable accepted: ok=True, stage=success
+1792309573.9666550 [ros2_control_node-1] [INFO] [1792309573.966508315] [left_arm_jtc]: Received new action goal
+1792309573.9668322 [ros2_control_node-1] [INFO] [1792309573.966673491] [left_arm_jtc]: Accepted new action goal
+1792309583.2280359 [ros2_control_node-1] [INFO] [1792309583.227878194] [left_arm_jtc]: Goal reached, success!
+1792309603.6334631 [ros2_control_node-1] [INFO] [1792309603.633313930] [left_arm_jtc]: Received new action goal
+1792309603.6336312 [ros2_control_node-1] [INFO] [1792309603.633386413] [left_arm_jtc]: Accepted new action goal
+1792309606.8909762 [ros2_control_node-1] [INFO] [1792309606.890838696] [left_arm_jtc]: Goal reached, success!
+1792309616.7600622 [ros2_control_node-1] [INFO] [1792309616.759920112] [left_arm_jtc]: Received new action goal
+1792309616.7602251 [ros2_control_node-1] [INFO] [1792309616.760024897] [left_arm_jtc]: Accepted new action goal
+1792309620.0179827 [ros2_control_node-1] [INFO] [1792309620.017838645] [left_arm_jtc]: Goal reached, success!
+1792309620.0642047 [ros2_control_node-1] [INFO] [1792309620.064060526] [left_arm_jtc]: Received new action goal
+1792309620.0643992 [ros2_control_node-1] [INFO] [1792309620.064125396] [left_arm_jtc]: Accepted new action goal
+1792309623.3230536 [ros2_control_node-1] [INFO] [1792309623.322839096] [left_arm_jtc]: Goal reached, success!
+1792309623.3680351 [ros2_control_node-1] [INFO] [1792309623.367931870] [left_arm_jtc]: Received new action goal
+1792309623.3681598 [ros2_control_node-1] [INFO] [1792309623.367998097] [left_arm_jtc]: Accepted new action goal
+1792309626.6269760 [ros2_control_node-1] [INFO] [1792309626.626837781] [left_arm_jtc]: Goal reached, success!
+1792309630.3305383 [ros2_control_node-1] [INFO] [1792309630.330303379] [left_arm_jtc]: Received new action goal
+1792309630.3306649 [ros2_control_node-1] [INFO] [1792309630.330351905] [left_arm_jtc]: Accepted new action goal
+1792309630.4520667 [ros2_control_node-1] [INFO] [1792309630.451841480] [left_arm_jtc]: Goal reached, success!
+1792309630.4842494 [ros2_control_node-1] [INFO] [1792309630.484127308] [left_arm_jtc]: Received new action goal
+1792309630.4844105 [ros2_control_node-1] [INFO] [1792309630.484204842] [left_arm_jtc]: Accepted new action goal
+1792309632.1019518 [ros2_control_node-1] [INFO] [1792309632.101837793] [left_arm_jtc]: Goal reached, success!
+1792309632.1366770 [ros2_control_node-1] [INFO] [1792309632.136601409] [left_arm_jtc]: Received new action goal
+1792309632.1368074 [ros2_control_node-1] [INFO] [1792309632.136658779] [left_arm_jtc]: Accepted new action goal
+1792309633.7559600 [ros2_control_node-1] [INFO] [1792309633.755837200] [left_arm_jtc]: Goal reached, success!
+1792309651.4054863 [ros2_control_node-1] [INFO] [1792309651.405306687] [left_arm_jtc]: Received new action goal
+1792309651.4056547 [ros2_control_node-1] [INFO] [1792309651.405382126] [left_arm_jtc]: Accepted new action goal
+1792309654.8559933 [ros2_control_node-1] [INFO] [1792309654.855838274] [left_arm_jtc]: Goal reached, success!
+1792309668.9924560 [ros2_control_node-1] [INFO] [1792309668.992306548] [left_arm_jtc]: Received new action goal
+1792309668.9926245 [ros2_control_node-1] [INFO] [1792309668.992380211] [left_arm_jtc]: Accepted new action goal
+1792309671.6339777 [ros2_control_node-1] [INFO] [1792309671.633837514] [left_arm_jtc]: Goal reached, success!
+1792309713.4738779 [ros2_control_node-1] [INFO] [1792309713.473729971] [left_arm_jtc]: Received new action goal
+1792309713.4740450 [ros2_control_node-1] [INFO] [1792309713.473779620] [left_arm_jtc]: Accepted new action goal
+1792309714.9459820 [ros2_control_node-1] [INFO] [1792309714.945838380] [left_arm_jtc]: Goal reached, success!
+1792309747.7645788 [ros2_control_node-1] [INFO] [1792309747.764425741] [left_arm_jtc]: Received new action goal
+1792309747.7647476 [ros2_control_node-1] [INFO] [1792309747.764554797] [left_arm_jtc]: Accepted new action goal
+1792309752.7409885 [ros2_control_node-1] [INFO] [1792309752.740838224] [left_arm_jtc]: Goal reached, success!
+1792309782.4098580 [ros2_control_node-1] [INFO] [1792309782.409710558] [left_arm_jtc]: Received new action goal
+1792309782.4100461 [ros2_control_node-1] [INFO] [1792309782.409795979] [left_arm_jtc]: Accepted new action goal
+1792309785.5339713 [ros2_control_node-1] [INFO] [1792309785.533837915] [left_arm_jtc]: Goal reached, success!
+1792309795.8939312 [control_enable_adapter-5] [INFO] [1792309795.893808732] [control_enable_adapter]: /rt/disable accepted: ok=True, stage=success
+1792309800.8518705 [control_enable_adapter-5] [INFO] [1792309800.851741701] [control_enable_adapter]: /rt/enable accepted: ok=True, stage=success
+1792309806.4201419 [ros2_control_node-1] [INFO] [1792309806.419988887] [left_arm_jtc]: Received new action goal
+1792309806.4203122 [ros2_control_node-1] [INFO] [1792309806.420206964] [left_arm_jtc]: Accepted new action goal
+1792309816.0833850 [ros2_control_node-1] [INFO] [1792309816.083233436] [left_arm_jtc]: Received new action goal
+1792309816.0835526 [ros2_control_node-1] [INFO] [1792309816.083292083] [left_arm_jtc]: Accepted new action goal
+1792309816.8531311 [ros2_control_node-1] [INFO] [1792309816.853013531] [left_arm_jtc]: Goal reached, success!
+1792309828.2548161 [ros2_control_node-1] [INFO] [1792309828.254665908] [left_arm_jtc]: Received new action goal
+1792309828.2550194 [ros2_control_node-1] [INFO] [1792309828.254818087] [left_arm_jtc]: Accepted new action goal
+1792309837.7729807 [ros2_control_node-1] [INFO] [1792309837.772840117] [left_arm_jtc]: Goal reached, success!
+1792309872.8300643 [ros2_control_node-1] [INFO] [1792309872.829889491] [left_arm_jtc]: Received new action goal
+1792309872.8302748 [ros2_control_node-1] [INFO] [1792309872.830000685] [left_arm_jtc]: Accepted new action goal
+1792309875.0779877 [ros2_control_node-1] [INFO] [1792309875.077838307] [left_arm_jtc]: Goal reached, success!
+1792309895.1677816 [ros2_control_node-1] [INFO] [1792309895.167637321] [left_arm_jtc]: Received new action goal
+1792309895.1679649 [ros2_control_node-1] [INFO] [1792309895.167723523] [left_arm_jtc]: Accepted new action goal
+1792309898.4649811 [ros2_control_node-1] [INFO] [1792309898.464837912] [left_arm_jtc]: Goal reached, success!
+1792309908.9060001 [ros2_control_node-1] [INFO] [1792309908.905842806] [left_arm_jtc]: Received new action goal
+1792309908.9061799 [ros2_control_node-1] [INFO] [1792309908.905931980] [left_arm_jtc]: Accepted new action goal
+1792309913.3999746 [ros2_control_node-1] [INFO] [1792309913.399838192] [left_arm_jtc]: Goal reached, success!
+1792309934.8287060 [control_enable_adapter-5] [INFO] [1792309934.828569517] [control_enable_adapter]: /rt/disable accepted: ok=True, stage=success
+1792316612.6403112 [control_enable_adapter-5] [INFO] [1792316612.640175932] [control_enable_adapter]: /rt/enable accepted: ok=True, stage=success
+1792316629.2178469 [ros2_control_node-1] [INFO] [1792316629.217683259] [left_arm_jtc]: Received new action goal
+1792316629.2180376 [ros2_control_node-1] [INFO] [1792316629.217840318] [left_arm_jtc]: Accepted new action goal
+1792316634.2956765 [ros2_control_node-1] [INFO] [1792316634.295528526] [left_arm_jtc]: Received new action goal
+1792316634.2958298 [ros2_control_node-1] [INFO] [1792316634.295570368] [left_arm_jtc]: Accepted new action goal
+1792316635.0650337 [ros2_control_node-1] [INFO] [1792316635.064918427] [left_arm_jtc]: Goal reached, success!
+1792316647.6339271 [ros2_control_node-1] [INFO] [1792316647.633780535] [left_arm_jtc]: Received new action goal
+1792316647.6341023 [ros2_control_node-1] [INFO] [1792316647.633834499] [left_arm_jtc]: Accepted new action goal
+1792316648.9849811 [ros2_control_node-1] [INFO] [1792316648.984839405] [left_arm_jtc]: Goal reached, success!
+1792316655.9338605 [ros2_control_node-1] [INFO] [1792316655.933712606] [left_arm_jtc]: Received new action goal
+1792316655.9340284 [ros2_control_node-1] [INFO] [1792316655.933781998] [left_arm_jtc]: Accepted new action goal
+1792316657.3999660 [ros2_control_node-1] [INFO] [1792316657.399838343] [left_arm_jtc]: Goal reached, success!
+1792316697.6412246 [control_enable_adapter-5] [INFO] [1792316697.641092896] [control_enable_adapter]: /rt/disable accepted: ok=True, stage=success
+1792325639.9197793 [control_enable_adapter-5] [INFO] [1792325639.919646081] [control_enable_adapter]: /rt/enable accepted: ok=True, stage=success
+1792325643.3173978 [ros2_control_node-1] [INFO] [1792325643.317247750] [left_arm_jtc]: Received new action goal
+1792325643.3175676 [ros2_control_node-1] [INFO] [1792325643.317479700] [left_arm_jtc]: Accepted new action goal
+1792325660.9519894 [ros2_control_node-1] [INFO] [1792325660.951838927] [left_arm_jtc]: Goal reached, success!
+1792325837.6029279 [ros2_control_node-1] [INFO] [1792325837.602780325] [left_arm_jtc]: Received new action goal
+1792325837.6031086 [ros2_control_node-1] [INFO] [1792325837.602942009] [left_arm_jtc]: Accepted new action goal
+1792325846.3949878 [ros2_control_node-1] [INFO] [1792325846.394838809] [left_arm_jtc]: Goal reached, success!
+1792325846.7374935 [ros2_control_node-1] [INFO] [1792325846.737328571] [resource_manager]: 'deactivate' hardware 'ecat_arms' 
+1792325846.7375772 [ros2_control_node-1] [INFO] [1792325846.737355694] [EthercatDriver]: Stopping ...please wait...
+1792325846.7582245 [ros2_control_node-1] [INFO] [1792325846.758148012] [EthercatDriver]: System successfully stopped!
+1792325846.7582614 [ros2_control_node-1] [INFO] [1792325846.758159811] [resource_manager]: Successful 'deactivate' of hardware 'ecat_arms'
+1792325846.7586784 [ros2_control_node-1] [INFO] [1792325846.758582307] [resource_manager]: 'cleanup' hardware 'ecat_arms' 
+1792325846.7587352 [ros2_control_node-1] [INFO] [1792325846.758587572] [resource_manager]: Successful 'cleanup' of hardware 'ecat_arms'
+1792325846.8766680 [ros2_control_node-1] [INFO] [1792325846.876489006] [rclcpp]: signal_handler(SIGINT/SIGTERM)
+1792325846.8768587 [ros2_control_node-1] [INFO] [1792325846.876573805] [controller_manager]: Shutdown request received....
+1792325846.8768857 [ros2_control_node-1] [INFO] [1792325846.876615182] [controller_manager]: Shutting down all controllers in the controller manager.
+1792325846.8769054 [ros2_control_node-1] [INFO] [1792325846.876631552] [controller_manager]: Shutting down controller 'left_arm_jtc'
+1792325846.8769226 [ros2_control_node-1] [INFO] [1792325846.876663048] [controller_manager]: Shutting down controller 'joint_state_broadcaster'
+1792325846.8769395 [ros2_control_node-1] [INFO] [1792325846.876683415] [controller_manager]: Shutting down controller 'rt_internal_state_broadcaster'
+1792325846.8769541 [ros2_control_node-1] [INFO] [1792325846.876702559] [controller_manager]: Shutting down controller 'enable_manager'
+1792325846.8769684 [ros2_control_node-1] [INFO] [1792325846.876730375] [resource_manager]: 'shutdown' hardware 'ecat_arms' 
+1792325846.8769836 [ros2_control_node-1] [INFO] [1792325846.876737194] [resource_manager]: Successful 'shutdown' of hardware 'ecat_arms'
+1792325846.8769979 [ros2_control_node-1] [INFO] [1792325846.876741259] [controller_manager]: Shutting down the controller manager.
+1792325846.8935473 [scope_capabilities-6] Traceback (most recent call last):
+1792325846.8936300 [scope_capabilities-6]   File "/home/ar/rt-control-electri127/install/lib/rt_control_bringup/scope_capabilities", line 8, in <module>
+1792325846.8937583 [scope_capabilities-6]     sys.exit(capabilities_main())
+1792325846.8937843 [scope_capabilities-6]   File "/home/ar/rt-control-electri127/install/local/lib/python3.10/dist-packages/rt_control_bringup/scope_lifecycle.py", line 223, in capabilities_main
+1792325846.8938110 [scope_capabilities-6]     rclpy.spin(node)
+1792325846.8938282 [scope_capabilities-6]   File "/opt/ros/humble/local/lib/python3.10/dist-packages/rclpy/__init__.py", line 229, in spin
+1792325846.8938928 [scope_capabilities-6]     executor.spin_once()
+1792325846.8939154 [scope_capabilities-6]   File "/opt/ros/humble/local/lib/python3.10/dist-packages/rclpy/executors.py", line 808, in spin_once
+1792325846.8939326 [scope_capabilities-6]     self._spin_once_impl(timeout_sec)
+1792325846.8939550 [scope_capabilities-6]   File "/opt/ros/humble/local/lib/python3.10/dist-packages/rclpy/executors.py", line 797, in _spin_once_impl
+1792325846.8939700 [scope_capabilities-6]     handler, entity, node = self.wait_for_ready_callbacks(timeout_sec=timeout_sec)
+1792325846.8939846 [scope_capabilities-6]   File "/opt/ros/humble/local/lib/python3.10/dist-packages/rclpy/executors.py", line 780, in wait_for_ready_callbacks
+1792325846.8939986 [scope_capabilities-6]     return next(self._cb_iter)
+1792325846.8940132 [scope_capabilities-6]   File "/opt/ros/humble/local/lib/python3.10/dist-packages/rclpy/executors.py", line 681, in _wait_for_ready_callbacks
+1792325846.8940268 [scope_capabilities-6]     raise ExternalShutdownException()
+1792325846.8940413 [scope_capabilities-6] rclpy.executors.ExternalShutdownException
+1792325846.8965704 [ros2_control_node-1] Warning: class_loader.ClassLoader: SEVERE WARNING!!! Attempting to unload library while objects created by this loader exist in the heap! You should delete your objects before attempting to unload the library or destroying the ClassLoader. The library will NOT be unloaded.
+1792325846.8966000 [ros2_control_node-1]          at line 127 in ./src/class_loader.cpp
+1792325846.9920626 [INFO] [control_enable_adapter-5]: process has finished cleanly [pid 235709]
+1792325846.9929533 [INFO] [scope_capabilities-6]: sending signal 'SIGINT' to process[scope_capabilities-6]
+1792325846.9932816 [INFO] [ros2_control_node-1]: sending signal 'SIGINT' to process[ros2_control_node-1]
+1792325847.0048892 [ERROR] [scope_capabilities-6]: process has died [pid 235711, exit code 1, cmd '/home/ar/rt-control-electri127/install/lib/rt_control_bringup/scope_capabilities /home/ar/rt-control-electri127/artifacts/bench_left_arm_motion --ros-args'].
+1792325847.0152650 [INFO] [ros2_control_node-1]: process has finished cleanly [pid 235371]

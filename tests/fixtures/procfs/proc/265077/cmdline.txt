@@ -1,0 +1,1 @@
+/opt/ros/humble/lib/controller_manager/ros2_control_node --ros-args --params-file /tmp/launch_params_uaki5lqi --params-file /home/ar/rt-control-electri127/artifacts/bench_left_arm_motion/controllers.yaml 

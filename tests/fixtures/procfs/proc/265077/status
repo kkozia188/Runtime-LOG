@@ -1,0 +1,57 @@
+Name:	ros2_control_no
+Umask:	0002
+State:	S (sleeping)
+Tgid:	265077
+Ngid:	0
+Pid:	265077
+PPid:	265050
+TracerPid:	0
+Uid:	1000	1000	1000	1000
+Gid:	1000	1000	1000	1000
+FDSize:	64
+Groups:	4 20 24 27 30 46 120 133 134 998 1000 1002 
+NStgid:	265077
+NSpid:	265077
+NSpgid:	265050
+NSsid:	265050
+VmPeak:	 2406900 kB
+VmSize:	 2342728 kB
+VmLck:	 2342704 kB
+VmPin:	       0 kB
+VmHWM:	  382612 kB
+VmRSS:	  381936 kB
+RssAnon:	  320632 kB
+RssFile:	   59376 kB
+RssShmem:	    1928 kB
+VmData:	  322500 kB
+VmStk:	     132 kB
+VmExe:	      16 kB
+VmLib:	   27372 kB
+VmPTE:	     904 kB
+VmSwap:	       0 kB
+HugetlbPages:	       0 kB
+CoreDumping:	0
+THP_enabled:	0
+Threads:	36
+SigQ:	0/127151
+SigPnd:	0000000000000000
+ShdPnd:	0000000000000000
+SigBlk:	0000000000000000
+SigIgn:	0000000080000001
+SigCgt:	00000001418044fe
+CapInh:	0000000000000000
+CapPrm:	0000000000000000
+CapEff:	0000000000000000
+CapBnd:	000001ffffffffff
+CapAmb:	0000000000000000
+NoNewPrivs:	0
+Seccomp:	0
+Seccomp_filters:	0
+Speculation_Store_Bypass:	thread vulnerable
+SpeculationIndirectBranch:	conditional enabled
+Cpus_allowed:	fff1555
+Cpus_allowed_list:	0,2,4,6,8,10,12,16-27
+Mems_allowed:	00000000,00000000,00000000,00000000,00000000,00000000,00000000,00000000,00000000,00000000,00000000,00000000,00000000,00000000,00000000,00000000,00000000,00000000,00000000,00000000,00000000,00000000,00000000,00000000,00000000,00000000,00000000,00000000,00000000,00000000,00000000,00000001
+Mems_allowed_list:	0
+voluntary_ctxt_switches:	8349
+nonvoluntary_ctxt_switches:	267

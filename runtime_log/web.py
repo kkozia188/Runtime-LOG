@@ -1,0 +1,163 @@
+"""Read-only LAN web view: run index and per-run reports. GET/HEAD only, no writes, no token."""
+
+from __future__ import annotations
+
+import html
+import json
+import logging
+import mimetypes
+import threading
+from http import HTTPStatus
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from pathlib import Path
+from urllib.parse import unquote, urlparse
+
+from .archive import INDEX, RUN_FILE, Archive, read_json
+from .recorder import load_run
+from .report import CSS, RESULT_COLOR, RESULT_LABEL, fmt_s, fmt_time, render
+
+LOG = logging.getLogger("runtime_log.web")
+RUN_FILES = {"report.html", "run.json", "events.jsonl", "resources.jsonl", "ethercat.jsonl", "launch.log.gz"}
+
+
+def esc(value) -> str:
+    return html.escape("" if value is None else str(value))
+
+
+def render_index(index: dict) -> str:
+    runs = index.get("runs", [])
+    usage = index.get("usage", {})
+    rows = []
+    for run in runs:
+        result = run.get("result") or "?"
+        color = RESULT_COLOR.get(result, "#57606a")
+        anomalies = {k: v for k, v in (run.get("anomalies") or {}).items() if k.startswith(("ecat.", "process.died", "log.failures", "log.error"))}
+        top = ", ".join(f"{k.split('.', 1)[1]}×{v}" for k, v in sorted(anomalies.items(), key=lambda kv: -kv[1])[:3])
+        detail = run.get("failure_label") or ""
+        if run.get("failed_stage"):
+            detail = f'<b>{esc(run["failed_stage"])}</b>：{esc(detail)}'
+        else:
+            detail = esc(detail)
+        rows.append(
+            f'<tr data-result="{esc(result)}" data-hw="{esc(run.get("hardware"))}">'
+            f'<td class="mono">{esc(fmt_time(run.get("start")))}</td>'
+            f'<td><a href="{esc(run["id"])}/">{esc(run["id"])}</a></td>'
+            f'<td>{esc(run.get("scope"))}</td><td class="num">{esc(run.get("domain"))}</td><td>{esc(run.get("hardware"))}</td>'
+            f'<td><span class="badge" style="background:{color}">{esc(RESULT_LABEL.get(result, result))}</span></td>'
+            f'<td class="num">{fmt_s(run.get("duration_s"))}</td><td class="num">{fmt_s(run.get("ready_s"))}</td>'
+            f'<td>{detail}</td><td>{esc(run.get("last_stage"))}</td>'
+            f'<td class="num">{sum(anomalies.values()) or ""}</td><td class="mono">{esc(top)}</td>'
+            f'<td class="num">{esc(run.get("peak_cpu") if run.get("peak_cpu") is not None else "")}</td><td>{esc(run.get("source"))}</td></tr>'
+        )
+    running = any(run.get("result") == "running" for run in runs)
+    refresh = '<meta http-equiv="refresh" content="10">' if running else ""
+    archive_mb = (usage.get("archive_bytes") or 0) / 1024**2
+    free_gb = (usage.get("disk_free_bytes") or 0) / 1024**3
+    return f"""<!doctype html><html lang="zh-CN"><head><meta charset="utf-8">{refresh}<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Runtime-LOG</title><style>{CSS}</style></head><body><main style="max-width:1600px">
+<h1>Runtime-LOG · 运行记录</h1>
+<p class="k">共 {len(runs)} 次运行 · 归档 {archive_mb:.1f} MiB · 磁盘剩余 {free_gb:.1f} GiB · 保留 7 天 · 只读页面 · 更新于 {fmt_time(index.get("generated"))}</p>
+<div class="filters"><label>结果 <select id="fResult"><option value="">全部</option><option value="failed">失败</option><option value="ok">正常结束</option><option value="running">运行中</option><option value="aborted">未正常结束</option><option value="interrupted">记录中断</option></select></label>
+<label>硬件 <select id="fHw"><option value="">全部</option><option>ethercat</option><option>mock</option></select></label>
+<label><input id="fAnomaly" type="checkbox"> 只看有异常</label><label>搜索 <input id="fText" size="24"></label></div>
+<table id="runs"><tr><th>开始</th><th>运行</th><th>scope</th><th>域</th><th>硬件</th><th>结果</th><th>时长</th><th>就绪</th><th>失败步骤</th><th>最后成功步骤</th><th>异常</th><th>主要异常</th><th>峰值 CPU%</th><th>来源</th></tr>
+{"".join(rows) or '<tr><td colspan="14">还没有运行记录</td></tr>'}</table></main>
+<script>
+const rows=[...document.querySelectorAll('#runs tr[data-result]')];
+function apply(){{const r=fResult.value,h=fHw.value,a=fAnomaly.checked,t=fText.value.toLowerCase();
+rows.forEach(x=>{{const ok=(!r||x.dataset.result===r)&&(!h||x.dataset.hw===h)&&(!a||x.cells[10].textContent.trim())&&(!t||x.textContent.toLowerCase().includes(t));x.style.display=ok?'':'none'}})}}
+[fResult,fHw,fAnomaly,fText].forEach(e=>e.oninput=e.onchange=apply);
+</script></body></html>"""
+
+
+class Handler(BaseHTTPRequestHandler):
+    archive: Archive
+    server_version = "Runtime-LOG"
+
+    def log_message(self, fmt, *args):  # keep journald quiet
+        LOG.debug("%s " + fmt, self.address_string(), *args)
+
+    def _send(self, status: int, body: bytes, content_type: str, head: bool) -> None:
+        self.send_response(status)
+        self.send_header("Content-Type", content_type)
+        self.send_header("Content-Length", str(len(body)))
+        self.send_header("Cache-Control", "no-store")
+        self.send_header("X-Content-Type-Options", "nosniff")
+        self.end_headers()
+        if not head:
+            self.wfile.write(body)
+
+    def _route(self, head: bool) -> None:
+        path = unquote(urlparse(self.path).path)
+        parts = [part for part in path.split("/") if part]
+        root = self.archive.root
+        if not parts:
+            index = read_json(root / INDEX, {"runs": []})
+            self._send(200, render_index(index).encode(), "text/html; charset=utf-8", head)
+            return
+        if parts == ["index.json"]:
+            self._send(200, (root / INDEX).read_bytes() if (root / INDEX).exists() else b"{}", "application/json", head)
+            return
+        run_id = parts[0]
+        run_dir = root / run_id
+        if "/" in run_id or run_id.startswith(".") or not (run_dir / RUN_FILE).is_file():
+            self._send(404, b"not found", "text/plain", head)
+            return
+        if len(parts) == 1:
+            if not path.endswith("/"):
+                self.send_response(HTTPStatus.MOVED_PERMANENTLY)
+                self.send_header("Location", f"/{run_id}/")
+                self.end_headers()
+                return
+            parts.append("report.html")
+        name = parts[1]
+        if len(parts) != 2 or name not in RUN_FILES:
+            self._send(404, b"not found", "text/plain", head)
+            return
+        if name == "report.html":
+            document, events = load_run(run_dir)
+            stored = run_dir / "report.html"
+            if document.get("result") != "running" and stored.exists():
+                body = stored.read_bytes()
+            else:
+                body = render(document, events, run_dir).encode()
+            self._send(200, body, "text/html; charset=utf-8", head)
+            return
+        target = run_dir / name
+        if not target.is_file():
+            self._send(404, b"not found", "text/plain", head)
+            return
+        content_type = "application/gzip" if name.endswith(".gz") else (mimetypes.guess_type(name)[0] or "text/plain; charset=utf-8")
+        if name.endswith(".jsonl"):
+            content_type = "text/plain; charset=utf-8"
+        self._send(200, target.read_bytes(), content_type, head)
+
+    def do_GET(self):  # noqa: N802
+        try:
+            self._route(False)
+        except (BrokenPipeError, ConnectionResetError):
+            pass
+        except Exception:
+            LOG.exception("request failed: %s", self.path)
+            self._send(500, b"internal error", "text/plain", False)
+
+    def do_HEAD(self):  # noqa: N802
+        self._route(True)
+
+    def _refuse(self):
+        self._send(405, b"read-only", "text/plain", False)
+
+    do_POST = do_PUT = do_DELETE = do_PATCH = _refuse
+
+
+def serve(archive: Archive, host: str, port: int) -> ThreadingHTTPServer:
+    handler = type("BoundHandler", (Handler,), {"archive": archive})
+    server = ThreadingHTTPServer((host, port), handler)
+    server.daemon_threads = True
+    thread = threading.Thread(target=server.serve_forever, name="runtime-log-web", daemon=True)
+    thread.start()
+    LOG.info("web on http://%s:%s/", host, port)
+    return server
+
+
+__all__ = ["serve", "render_index", "json"]
