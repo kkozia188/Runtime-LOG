@@ -252,6 +252,37 @@ def test_recorder_attaches_the_control_process_segment_and_reports_blackbox_even
     assert "1 kHz 黑匣子" in page and "window.mcap" in page
 
 
+def test_console_audit_lines_of_this_domain_join_the_timeline(tmp_path, profile, artifact_dir, monkeypatch):
+    home = tmp_path / "home"
+    audit = home / ".ros/log/rt_control_arm_console/audit.jsonl"
+    audit.parent.mkdir(parents=True)
+    log_dir = tmp_path / f"x-{LAUNCH_PID}"
+    log_dir.mkdir()
+    lines = (FIXTURES / "launch_normal.log").read_text()
+    (log_dir / "launch.log").write_text(lines)
+    start = float(lines.split(" ", 1)[0])
+    proc = FakeProc(artifact_dir)
+    monkeypatch.setattr(proc, "environ", lambda pid: {"ROS_DOMAIN_ID": "77", "HOME": str(home)})
+    entries = [
+        {"ts": start - 100, "domain": "77", "action": "login", "ok": True},  # before the run
+        {"ts": start + 10, "domain": "91", "action": "enable", "args": {"enabled": True}, "ok": True},  # other stack
+        {"ts": start + 20, "domain": "77", "action": "enable", "args": {"enabled": True}, "ok": True, "session": "ab12cd34"},
+        {"ts": start + 30, "domain": "77", "action": "goto_pose", "args": {"name": "home", "gear": "low"}, "ok": False,
+         "error": "not_enabled", "message": "请先使能"},
+    ]
+    audit.write_text("".join(json.dumps(e) + "\n" for e in entries[:3]))
+    recorder = RunRecorder(LAUNCH_PID, log_dir, profile, Archive(tmp_path / "runs"), proc, None)
+    recorder.tick(recorder.start + 1)
+    with audit.open("a") as stream:
+        stream.write(json.dumps(entries[3]) + "\n")
+    recorder.tick(recorder.start + 3)
+    operator = [e for e in recorder.events if e.kind == "operator"]
+    assert [(e.label, e.level) for e in operator] == [("操作台使能", "info"), ("去位姿", "warn")]
+    assert "会话 ab12cd34" in operator[0].message and "请先使能" in operator[1].message
+    document = recorder.finish(recorder.start + 4)
+    assert document["summary"]["anomalies"]["operator.rejected"] == 1
+
+
 def test_counter_events_from_archived_rows_ignore_in_flight_dips():
     from runtime_log.recorder import counter_events
 

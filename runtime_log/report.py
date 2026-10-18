@@ -157,6 +157,7 @@ def gantt(summary: dict, events: list[Event], ecat_rows: list[dict], t0: float, 
     markers("启动步骤", [e for e in events if e.kind == STAGE], lambda e: "#0969da")
     markers("失败/停止", [e for e in events if e.kind in (FAILURE, SHUTDOWN, SIGNAL)], lambda e: "#cf222e" if e.kind == FAILURE else "#9a6700")
     markers("控制事件", [e for e in events if e.kind == CONTROL], lambda e: "#8250df")
+    markers("操作台", [e for e in events if e.kind == "operator"], lambda e: "#1b7c83" if e.data.get("ok", True) else "#bf8700")
     markers("黑匣子", [e for e in events if e.rule in ("blackbox_saved", "blackbox_expected")], lambda e: "#cf222e" if e.rule == "blackbox_saved" else "#8c959f")
     markers("EtherCAT 内核", [e for e in events if e.kind == ECAT and e.source == "kernel"], lambda e: {"error": "#cf222e", "warn": "#bf8700"}.get(e.level, "#57606a"))
 

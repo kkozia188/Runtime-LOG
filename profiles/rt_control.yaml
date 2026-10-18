@@ -7,6 +7,8 @@ run:
   # Which `ros2 launch` processes start a run (regex over the space-joined command line).
   launch_match: 'ros2 launch rt_control_bringup \S+\.launch\.py'
   artifact_arg: generated_dir
+  # Operator console audit log (rt_control_arm_console --audit-log); ~ = HOME of the launch process.
+  console_audit: ~/.ros/log/rt_control_arm_console/audit.jsonl
   # Processes whose non-zero exit is an anomaly, not a failed run (the optional recorder spawner).
   optional_processes:
     - runtime_log_recorder_spawner

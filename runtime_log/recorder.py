@@ -20,6 +20,7 @@ from .ethercat import CounterTracker, EthercatPoller
 from .launchlog import parse_line
 from .meta import artifact_info, git_info, hardware_kind, host_info, launch_args, params_files, ros_overrides, thread_layout
 from .model import PROCESS_STARTED, SHUTDOWN, SIGNAL, Event
+from . import console_audit
 from .blackbox import BlackBox
 from .blackbox import Settings as BlackBoxSettings
 from .procfs import CpuSampler, ProcFS
@@ -138,6 +139,9 @@ class RunRecorder:
         self.peak_rss_kib = 0
         self.threads: dict[int, dict] = {}
         self.ended: Optional[float] = None
+        audit_setting = profile.run.get("console_audit")
+        audit_path = Path(audit_setting.replace("~", environ.get("HOME", str(Path.home())), 1)) if audit_setting else None
+        self.audit_tail = LogTail(audit_path) if audit_path else None
         if previous:
             self._restore_polled_events()
         self.document = {
@@ -305,6 +309,13 @@ class RunRecorder:
                                  rule="blackbox_expected", label="预期内的状态切换（" + item["explained_by"] + "）",
                                  data={"reasons": item["reasons"], "explained_by": item["explained_by"]}))
 
+    def poll_console_audit(self) -> None:
+        if self.audit_tail is None:
+            return
+        end = None if self.ended is None else self.ended + 3.0
+        for event in console_audit.parse_lines(self.audit_tail.read(), self.domain, self.start - 1.0, end):
+            self._emit(event)
+
     def manual_trigger(self, reason: str) -> int:
         for box in self._active_boxes():
             box.trigger("manual", None, reason)
@@ -420,6 +431,7 @@ class RunRecorder:
             self.next_ecat = now + period
         if now >= self.next_attach:
             self.attach_segments()
+            self.poll_console_audit()
             self.next_attach = now + 1.0
         self.drain_blackbox_events()
         if now >= self.next_flush:
@@ -469,6 +481,7 @@ class RunRecorder:
 
     def finish(self, now: Optional[float] = None, interrupted: bool = False) -> dict:
         self.stop(now)
+        self.poll_console_audit()
         boxes = self._active_boxes()
         for box in boxes:
             box.stop()

@@ -125,7 +125,11 @@ def _controllers(events: list[Event], t0: float) -> list[dict]:
 def _anomalies(events: list[Event], shutdown_ts: Optional[float], optional: set = frozenset()) -> dict:
     counts: Counter = Counter()
     for event in events:
-        if event.kind == "blackbox" and event.rule == "blackbox_saved":
+        if event.kind == "operator":
+            counts["operator.requests"] += 1
+            if not event.data.get("ok", True):
+                counts["operator.rejected"] += 1
+        elif event.kind == "blackbox" and event.rule == "blackbox_saved":
             counts["blackbox.saved"] += 1
             for reason in event.data.get("reasons", []):
                 counts[f"blackbox.{reason}"] += 1
@@ -154,7 +158,7 @@ def _anomalies(events: list[Event], shutdown_ts: Optional[float], optional: set 
 
 def is_anomaly_key_informational(key: str) -> bool:
     """Counts shown but not highlighted (expected noise)."""
-    return key in ("log.warning_lines", "process.nonzero_exit_during_shutdown") or key.startswith("shutdown.")
+    return key in ("log.warning_lines", "process.nonzero_exit_during_shutdown") or key.startswith(("shutdown.", "operator."))
 
 
 __all__ = ["summarize", "sort_events", "phase_of", "CONTROL"]
