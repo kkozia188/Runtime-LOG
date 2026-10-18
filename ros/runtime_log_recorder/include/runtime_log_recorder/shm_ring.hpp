@@ -69,7 +69,10 @@ struct FieldEntry
 static_assert(sizeof(SegmentHeader) == 56, "line 0 layout");
 static_assert(sizeof(FieldEntry) == kFieldEntry, "field entry layout");
 
-inline size_t round_up(size_t value, size_t multiple) { return (value + multiple - 1) / multiple * multiple; }
+inline size_t round_up(size_t value, size_t multiple)
+{
+  return (value + multiple - 1) / multiple * multiple;
+}
 
 inline int64_t clock_ns(clockid_t clock)
 {
@@ -102,7 +105,8 @@ public:
       }
     }
     header_size_ = round_up(kFieldTableOffset + kFieldEntry * fields.size(), 4096);
-    slot_size_ = static_cast<uint32_t>(round_up(kSlotHeader + sizeof(double) * fields.size(), kCacheLine));
+    slot_size_ =
+      static_cast<uint32_t>(round_up(kSlotHeader + sizeof(double) * fields.size(), kCacheLine));
     slot_count_ = slot_count;
     field_count_ = static_cast<uint32_t>(fields.size());
     size_ = header_size_ + static_cast<size_t>(slot_size_) * slot_count_;
@@ -172,7 +176,9 @@ public:
   void set_state(WriterState state)
   {
     if (base_ != nullptr) {
-      __atomic_store_n(&reinterpret_cast<SegmentHeader *>(base_)->writer_state, static_cast<uint32_t>(state), __ATOMIC_RELEASE);
+      __atomic_store_n(
+        &reinterpret_cast<SegmentHeader *>(base_)->writer_state, static_cast<uint32_t>(state),
+        __ATOMIC_RELEASE);
     }
   }
 
