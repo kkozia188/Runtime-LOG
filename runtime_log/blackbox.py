@@ -64,6 +64,15 @@ class Settings:
     overrun_factor: float = 1.5  # counted in the cycle statistics
     overrun_trigger_factor: float = 3.0  # saves a window (a whole cycle was lost)
     stall_s: float = 0.2
+    # {field: {title, names, labels, trigger}} for enum fields of instrumented controllers.
+    enums: dict = field(default_factory=dict)
+
+
+def enum_name(spec: dict, number: float) -> tuple[str, str]:
+    index = int(number) if number == number else -1
+    names, labels = spec.get("names", []), spec.get("labels", [])
+    name = names[index] if 0 <= index < len(names) else f"#{index}"
+    return name, labels[index] if 0 <= index < len(labels) else name
 
 
 class TriggerScanner:
@@ -78,6 +87,8 @@ class TriggerScanner:
         self.age = index.get("ethercat_domain/process_data_age_ms")
         self.responding = index.get("ethercat_master/slaves_responding")
         self.link = index.get("ethercat_master/link_up")
+        self.enums = [(name, index[name], spec) for name, spec in settings.enums.items() if name in index]
+        self.state_events: list[dict] = []  # drained by the black box after each scan
         self.previous: dict[str, float] = {}
         self.nominal_ns: Optional[float] = None
         self._periods: list[int] = []
@@ -155,6 +166,17 @@ class TriggerScanner:
             before = self._edge("link", link)
             if before == 1.0 and link != 1.0:
                 add("link_down")
+        for name, i, spec in self.enums:
+            number = value(i)
+            before = self._edge(f"enum:{name}", number)
+            if before is None or before == number:
+                continue
+            new_name, new_label = enum_name(spec, number)
+            old_name, old_label = enum_name(spec, before)
+            self.state_events.append({"kind": "state_change", "ts": time_ns / 1e9, "field": name, "title": spec.get("title", name),
+                                      "old": old_name, "new": new_name, "old_label": old_label, "new_label": new_label})
+            if new_name in spec.get("trigger", []):
+                add(f"{name}:{new_name}", f"{spec.get('title', name)}：{old_label} -> {new_label}")
         return found
 
     def drive_states(self) -> dict:
@@ -245,6 +267,10 @@ class BlackBox(threading.Thread):
             self.history.append((seq, slot))
             for found in self.scanner.scan(seq, slot):
                 self._add_trigger(found)
+            if self.scanner.state_events:
+                for event in self.scanner.state_events:
+                    self.on_event(event)
+                self.scanner.state_events.clear()
         while len(self.history) > keep:
             self.history.popleft()
         self._external_triggers()

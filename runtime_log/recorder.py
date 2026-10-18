@@ -85,7 +85,7 @@ class RunRecorder:
     ):
         self.launch_pid = launch_pid
         self.shm_dir = shm_dir
-        self.blackbox_settings = blackbox_settings
+        self.blackbox_settings = blackbox_settings or BlackBoxSettings(enums=profile.blackbox.get("enums", {}) or {})
         self.blackboxes: dict[str, BlackBox] = {}
         self.blackbox_events: "queue.Queue[dict]" = queue.Queue()
         self.next_attach = 0.0
@@ -301,7 +301,11 @@ class RunRecorder:
                 item = self.blackbox_events.get_nowait()
             except queue.Empty:
                 return
-            if item["kind"] == "blackbox_saved":
+            if item["kind"] == "state_change":
+                self._emit(Event(item["ts"], "state", "controller", item["field"], f"{item['title']}：{item['old_label']} → {item['new_label']}",
+                                 "info", rule=f"state_{item['field']}", label=f"{item['title']}：{item['new_label']}",
+                                 data={"old": item["old"], "new": item["new"]}))
+            elif item["kind"] == "blackbox_saved":
                 self._emit(Event(item["ts"], "blackbox", "runtime-log", item["dir"], item.get("detail", ""), "error",
                                  rule="blackbox_saved", label="黑匣子触发：" + ", ".join(item["reasons"]), data={"reasons": item["reasons"], "dir": item["dir"]}))
             else:

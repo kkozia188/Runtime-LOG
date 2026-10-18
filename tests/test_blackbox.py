@@ -157,6 +157,24 @@ def test_power_loss_and_quick_stop_are_triggers_and_states_are_decoded(tmp_path)
     assert states["left_joint1"]["state"] == "quick_stop_active" and states["left_joint1"]["label"] == "快速停机"
 
 
+def test_enable_manager_trace_becomes_state_events_and_emergency_saves_a_window(tmp_path, profile):
+    pytest.importorskip("mcap")
+    fields = ["phase", "owner", "last_failure_stage"]
+    writer = PyWriter(tmp_path / "em", fields)
+    events = []
+    box = BlackBox(writer.path, tmp_path / "bb", Settings(pre_s=1, post_s=0.2, stall_s=3600, enums=profile.blackbox["enums"]),
+                   on_event=events.append)
+    for phase, stage, count in ((2, 0, 1200), (3, 0, 300), (4, 0, 200), (6, 0, 500), (13, 13, 400)):
+        for _ in range(count):
+            writer.write([phase, 1, stage])
+    box._step(final=True)
+    changes = [(e["field"], e["old_label"], e["new_label"]) for e in events if e["kind"] == "state_change"]
+    assert changes == [("phase", "空闲", "使能中"), ("phase", "使能中", "批间等待"), ("phase", "批间等待", "已使能"),
+                       ("phase", "已使能", "紧急快停"), ("last_failure_stage", "success", "fault_detected")]
+    saved = [e for e in events if e["kind"] == "blackbox_saved"]
+    assert saved and set(saved[0]["reasons"]) == {"phase:emergency_quick_stop", "last_failure_stage:fault_detected"}
+
+
 def test_reader_rejects_foreign_files(tmp_path):
     path = tmp_path / "junk"
     path.write_bytes(b"x" * 8192)

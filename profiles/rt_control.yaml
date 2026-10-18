@@ -40,6 +40,30 @@ ethercat:
       0xA000: 主站掉线或退出 OP（零差手册 7.2.27；台架已列为启动可复位码）
       0x730F: 台架 J3 已声明的编码器电池码（启动预检放行）
 
+# Enum fields written by instrumented controllers (enable_manager runtime_log_trace). Values are
+# the C++ enum order; every change becomes a timeline event, listed names also save a window.
+blackbox:
+  enums:
+    phase:
+      title: 使能状态机
+      names: [inactive, startup_sanitizing, idle, enabling, inter_batch_delay, jtc_activating, enabled,
+              jtc_deactivating, disabling, rollback, reset_low, reset_high, reset_disabling,
+              emergency_quick_stop, emergency_disable, failed]
+      labels: [未激活, 启动清理, 空闲, 使能中, 批间等待, 激活轨迹控制器, 已使能, 停用轨迹控制器, 失能中,
+               回滚, 复位（低）, 复位（高）, 复位后失能, 紧急快停, 紧急失能, 失败]
+      trigger: [emergency_quick_stop, emergency_disable, failed]
+    last_failure_stage:
+      title: 使能失败阶段
+      names: [success, already_enabled, already_disabled, already_clear, operation_in_progress,
+              controller_inactive, preempted_by_disable, enable_batch_timeout, enable_invalid_state,
+              mode_mismatch, mode_not_confirmed, state_sources_not_ready, motion_fault, fault_detected,
+              unexpected_drive_state, disable_timeout, fault_requires_reset, fault_reset_timeout,
+              jtc_activate_failed, jtc_deactivate_failed, controller_update_timeout, restart_required]
+      trigger: [enable_batch_timeout, enable_invalid_state, mode_mismatch, mode_not_confirmed,
+                state_sources_not_ready, motion_fault, fault_detected, unexpected_drive_state,
+                disable_timeout, fault_reset_timeout, jtc_activate_failed, jtc_deactivate_failed,
+                controller_update_timeout]
+
 # Stages in startup order. "controller" groups are reported in the controller table.
 stages:
   - id: launch_started

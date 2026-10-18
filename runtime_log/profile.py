@@ -41,6 +41,7 @@ class Profile:
     ethercat: dict = field(default_factory=dict)
     git_repos: list[str] = field(default_factory=list)
     process_order: list[str] = field(default_factory=list)
+    blackbox: dict = field(default_factory=dict)
 
     def classify(self, line: LogLine) -> list[Event]:
         """Events for one launch.log line: process lifecycle, rule hits, and unmatched WARN/ERROR."""
@@ -99,4 +100,5 @@ def load_profile(path: str | Path) -> Profile:
         ethercat=document.get("ethercat", {}) or {},
         git_repos=list(document.get("git_repos", []) or []),
         process_order=list(document.get("process_order", []) or []),
+        blackbox=document.get("blackbox", {}) or {},
     )
