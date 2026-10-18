@@ -67,11 +67,15 @@ def test_poller_refuses_anything_but_master_and_slaves():
             poller._call(forbidden)
 
 
-def test_counter_deltas_and_module_reload():
+def test_counter_deltas_ignore_in_flight_dips_and_detect_reload():
     tracker = ethercat.CounterTracker()
-    assert tracker.update({"lost_frames": 10}) == {}
-    assert tracker.update({"lost_frames": 13}) == {"lost_frames": 3}
-    assert tracker.update({"lost_frames": 2}) == {"lost_frames": 2}  # reloaded master restarts at 0
+    assert tracker.update({"tx_frames": 1000, "lost_frames": 541}) == {}
+    # tx - rx read while one frame is in flight: 540, then back to 541 -> no loss at all
+    assert tracker.update({"tx_frames": 2000, "lost_frames": 540}) == {"tx_frames": 1000, "lost_frames": 0}
+    assert tracker.update({"tx_frames": 3000, "lost_frames": 541}) == {"tx_frames": 1000, "lost_frames": 0}
+    assert tracker.update({"tx_frames": 4000, "lost_frames": 544}) == {"tx_frames": 1000, "lost_frames": 3}
+    # master reloaded: tx_frames restarts near 0
+    assert tracker.update({"tx_frames": 50, "lost_frames": 2}) == {"tx_frames": 50, "lost_frames": 2}
 
 
 def test_proc_stat_with_spaces_and_parentheses():

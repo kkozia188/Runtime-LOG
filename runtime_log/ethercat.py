@@ -110,19 +110,28 @@ class EthercatPoller:
 
 
 class CounterTracker:
-    """Per-interval deltas of monotonically increasing master counters; resets are reported."""
+    """Per-interval deltas of master counters.
+
+    `Lost frames` is tx - rx taken from a non-atomic snapshot, so it dips by one while a frame is in
+    flight. Deltas are therefore taken against each counter's high-water mark (dips count as 0), and
+    only a decrease of `tx_frames` is treated as a master reload (high-water marks reset).
+    """
 
     def __init__(self):
-        self.previous: Optional[dict] = None
+        self.high: Optional[dict] = None
 
     def update(self, counters: dict) -> dict:
+        if self.high is None:
+            self.high = dict(counters)
+            return {}
+        if counters.get("tx_frames", 0) < self.high.get("tx_frames", 0):
+            self.high = {key: 0 for key in counters}
         delta = {}
-        if self.previous is not None:
-            for key, value in counters.items():
-                before = self.previous.get(key)
-                if before is None:
-                    continue
-                # A decrease means the master module was reloaded: report the new value as the delta.
-                delta[key] = value - before if value >= before else value
-        self.previous = dict(counters)
+        for key, value in counters.items():
+            mark = self.high.get(key)
+            if mark is None:
+                self.high[key] = value
+                continue
+            delta[key] = max(0, value - mark)
+            self.high[key] = max(mark, value)
         return delta

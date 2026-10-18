@@ -122,7 +122,11 @@ def _controllers(events: list[Event], t0: float) -> list[dict]:
 def _anomalies(events: list[Event], shutdown_ts: Optional[float]) -> dict:
     counts: Counter = Counter()
     for event in events:
-        if event.kind == ECAT and event.rule in kernlog.ANOMALY_RULES:
+        if event.kind == ECAT and event.rule == "counter_increase":
+            for key in ("lost_frames", "tx_errors"):
+                if event.data.get(key):
+                    counts[f"ecat.{key}"] += int(event.data[key])
+        elif event.kind == ECAT and event.rule in kernlog.ANOMALY_RULES:
             amount = event.data.get("count", 1) if event.rule.startswith("datagrams_") else 1
             counts[f"ecat.{event.rule}"] += int(amount)
         elif event.kind == ERROR:

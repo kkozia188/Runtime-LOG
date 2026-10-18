@@ -283,13 +283,9 @@ class RunRecorder:
         if states != self.last_slave_states:
             self._emit(Event(now, "ecat", "ethercat", "slaves", states, "info", rule="slave_states_polled", label="从站状态（轮询）"))
             self.last_slave_states = states
-        if delta.get("lost_frames") or delta.get("tx_errors"):
-            self._emit(
-                Event(
-                    now, "ecat", "ethercat", "master", f"lost_frames +{delta.get('lost_frames', 0)}, tx_errors +{delta.get('tx_errors', 0)}",
-                    "warn", rule="counter_increase", label="主站计数增加", data={k: v for k, v in delta.items() if k in ("lost_frames", "tx_errors")},
-                )
-            )
+        event = counter_event(now, delta)
+        if event is not None:
+            self._emit(event)
 
     def ecat_period(self, now: float) -> Optional[float]:
         steady = self.ready_ts is not None and now - self.ready_ts >= self.settle_s
@@ -359,6 +355,27 @@ class RunRecorder:
         _copy_gzip(self.log_dir / "launch.log", self.dir / "launch.log.gz")
         write_json(self.dir / RUN_FILE, self.document)
         return self.document
+
+
+def counter_event(ts: float, delta: dict) -> Optional[Event]:
+    if not (delta.get("lost_frames") or delta.get("tx_errors")):
+        return None
+    return Event(
+        ts, "ecat", "ethercat", "master", f"lost_frames +{delta.get('lost_frames', 0)}, tx_errors +{delta.get('tx_errors', 0)}",
+        "warn", rule="counter_increase", label="主站计数增加", data={k: v for k, v in delta.items() if k in ("lost_frames", "tx_errors")},
+    )
+
+
+def counter_events(ethercat_rows: list[dict]) -> list[Event]:
+    """Rebuild counter events from archived `ethercat.jsonl` rows (replay)."""
+    tracker = CounterTracker()
+    events = []
+    for row in ethercat_rows:
+        if row.get("counters"):
+            event = counter_event(row["ts"], tracker.update(row["counters"]))
+            if event is not None:
+                events.append(event)
+    return events
 
 
 def _copy_gzip(source: Path, target: Path) -> None:

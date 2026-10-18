@@ -204,6 +204,15 @@ def test_discovery_matches_only_rt_control_launches(tmp_path, profile, artifact_
     assert Discovery(proc, profile.run["launch_match"]).scan() == []
 
 
+def test_counter_events_from_archived_rows_ignore_in_flight_dips():
+    from runtime_log.recorder import counter_events
+
+    rows = [{"ts": float(i), "counters": {"tx_frames": 1000 * (i + 1), "lost_frames": lost, "tx_errors": 732}}
+            for i, lost in enumerate([541, 541, 540, 541, 541, 545])]
+    events = counter_events(rows)
+    assert [(e.ts, e.data) for e in events] == [(5.0, {"lost_frames": 4, "tx_errors": 0})]
+
+
 def test_find_log_dir_picks_the_directory_with_the_pid_suffix(tmp_path):
     (tmp_path / "2026-10-18-14-47-48-1-host-1234").mkdir()
     (tmp_path / "2026-10-18-14-47-48-1-host-11234").mkdir()

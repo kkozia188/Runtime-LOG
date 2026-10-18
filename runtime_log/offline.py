@@ -16,8 +16,8 @@ from .meta import artifact_info, hardware_kind, host_info
 from .model import Event
 from .procfs import ProcFS
 from .profile import Profile
-from .recorder import load_run
-from .report import write_report
+from .recorder import counter_events, load_run
+from .report import read_jsonl, write_report
 from .sources import kernel_events, launch_events
 
 
@@ -127,8 +127,10 @@ def replay(run_dir: Path, profile: Profile) -> tuple[dict, list[Event]]:
         for event in stored:
             if event.source == "kernel":
                 event = kernlog.reclassify(event)
-            if event is not None and event.source != "launch":
-                events.append(event)
+            if event is None or event.source == "launch" or event.rule == "counter_increase":
+                continue
+            events.append(event)
+        events += counter_events(read_jsonl(run_dir / "ethercat.jsonl"))
     else:
         events = stored
     running = document.get("result") == "running"
