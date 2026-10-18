@@ -11,10 +11,10 @@ mkdir -p "$out"
 T=/sys/kernel/tracing; I="$T/instances/runtime_log_ab"
 env_file="$HOME/.config/runtime-log.env"
 cp "$env_file" "$out/runtime-log.env.before"
-sudo() { command sudo -n "$@"; }
-# Prime sudo before running (sudo -v); keep the credential alive for the whole test.
-command sudo -n -v || { echo "run 'sudo -v' first" >&2; exit 1; }
-( while sleep 60; do command sudo -n -v || exit; done ) & keepalive=$!
+# Non-interactive sudo: SUDO_ASKPASS=<helper> (sudo -A), or a cached credential (sudo -n).
+if [[ -n "${SUDO_ASKPASS:-}" ]]; then sudo() { command sudo -A "$@"; }; else sudo() { command sudo -n "$@"; }; fi
+sudo true || { echo "sudo not available non-interactively" >&2; exit 1; }
+keepalive=""
 
 cleanup() {
   kill "$keepalive" 2>/dev/null || true
