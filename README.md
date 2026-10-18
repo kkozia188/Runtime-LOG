@@ -16,6 +16,22 @@
 - 服务本身 `Nice=10`、IO idle，启动时把隔离核（`/sys/devices/system/cpu/isolated`）从自己的亲和性中去掉。
 - 只在运行期间记录；没有运行时只保留索引页。
 
+## P1：1 kHz 黑匣子
+
+- 记录控制器 `ros/runtime_log_recorder`（ros2_control 插件 `runtime_log_recorder/RecorderController`）：
+  每周期把配置的状态接口定长拷贝进共享内存环（`/dev/shm/runtime-log.<pid>.<名字>`，格式见 `docs/shm-format.md`）。
+  update 内无分配、锁、系统调用；共享内存不可用时只停用自己。微基准：25 轴档每周期写入最坏 4.7 µs。
+- robot_driver 通过单元部署配置 `runtime_log_recorder: {enabled: true}` 加载它（组合器自动列出全部状态接口，
+  独立且非致命的 spawner）。插件在工控机上单独编译：`deploy/build_recorder.sh ~/rt-control-electri127`。
+- 服务发现本次运行控制进程写的段，读者线程每 50 ms 取数、保留 30 s；触发后保存前 10 s、后 2 s 的 MCAP
+  （JSON + zstd，PlotJuggler/Foxglove 可打开）、触发原因与内核日志，在报告页下载。
+- 触发器：驱动 Fault、离开 Operation Enabled、WKC 错误计数增加、过程数据年龄 > 3 ms、从站离开 OP、
+  应答从站数下降、链路断开、周期 > 3 倍名义值、写入者停止或消失、内核 EtherCAT 错误、手动（`runtime-log trigger`）。
+  `/rt/disable` 或停机前后 2 s 内的状态切换算预期，只记事件不存窗口。
+- 每次运行都有周期统计（名义/平均/最小/最大周期、> 1.5 倍次数），来自记录控制器收到的实际周期。
+- 停机后：主站不在 Operation 时，SDO 读一次各驱动 0x603F/0x6041（只放行这两个对象）。
+- 依赖：`pip3 install --user -r requirements.txt`（mcap、zstandard）。
+
 ## 使用
 
 ```bash
@@ -24,6 +40,7 @@ python3 -m runtime_log list                      # 列出运行
 python3 -m runtime_log replay <运行ID前缀>        # 用当前 profile 重新分类并打印结论
 python3 -m runtime_log import ~/.ros/log/<dir>   # 导入以前的 launch 目录（--scope/--domain/--hardware）
 python3 -m runtime_log gc                        # 立即执行 7 天保留与磁盘保护
+python3 -m runtime_log trigger "原因"            # 手动保存黑匣子窗口
 ```
 
 主站轮询频率：启动期 5 Hz，就绪 5 s 后 1 Hz（`profiles/rt_control.yaml`）。
