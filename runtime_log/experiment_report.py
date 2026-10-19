@@ -93,7 +93,7 @@ def experiments_section(run: dict, run_dir: Optional[Path]) -> str:
             f'<td class="num">{_value(summary.get("max_error_deg"))} {esc(summary.get("max_error_joint") or "")}</td>'
             f'<td class="num">{_value(summary.get("worst_settle_s")) if summary.get("moving_joints") else "-"}</td>'
             f'<td class="num">{_value(summary.get("max_overshoot_deg"))}</td><td>{esc(", ".join(unsettled))}</td>'
-            f'<td><a href="experiments/{esc(row["dir"])}/data.mcap">data.mcap</a></td></tr>'
+            f'<td><a href="experiments/{esc(row["dir"])}/data.mcap">data.mcap</a> · <a href="experiments/{esc(row["dir"])}/data.csv">CSV</a></td></tr>'
         )
     return (EXPERIMENT_PICKER + '<table><tr><th></th><th>t (s)</th><th>实验</th><th>来源</th><th>操作</th><th>时长 s</th><th>运动关节</th><th>最大跟随误差 °</th>'
             '<th>最慢到位 s</th><th>最大超调 °</th><th>未到位</th><th>数据</th></tr>' + "".join(body) + "</table>")
@@ -129,7 +129,7 @@ def render_experiment(run_id: str, meta: dict, plot: dict) -> str:
         f'<div><div class="k">周期数 / 缺失</div><div class="v">{meta.get("cycles")} / {meta.get("missing_cycles")}</div></div>'
         f'<div><div class="k">周期 p99 / 最大 µs</div><div class="v">{(meta.get("period_us") or {}).get("p99")} / {(meta.get("period_us") or {}).get("max")}</div></div></div>'
         f'<p class="k">到位：终点误差小于 {settings.get("settle_tolerance_deg")}° 并保持 {settings.get("settle_hold_s")} s；跟随误差 = 实际发给驱动的目标位置 − 实际位置。'
-        f' 数据：<a href="data.mcap">data.mcap</a>（PlotJuggler / Foxglove）· <a href="meta.json">meta.json</a></p>'
+        f' 数据：<a href="data.mcap">data.mcap</a>（PlotJuggler / Foxglove）· <a href="data.csv">CSV</a>（Excel）· <a href="meta.json">meta.json</a></p>'
         f'<h2>逐关节指标</h2><table><tr><th>关节</th>{header}</tr>{rows}</table>'
         f'<h2>曲线</h2>{"".join(charts) or "<p class=k>无数据</p>"}'
         f'</main></body></html>'

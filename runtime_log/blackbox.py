@@ -396,7 +396,15 @@ class BlackBox(threading.Thread):
                 seq, slot = self.history[index]
             self._add_trigger(Trigger(seq, SLOT_HEAD.unpack_from(slot, 0)[1], reason, detail))
 
+    # A running experiment ends 1 s after the drives stop following (no JTC log line comes then).
+    EXPERIMENT_STOP_REASONS = ("drive_fault", "left_operation_enabled", "power_lost", "quick_stop", "writer_died", "writer_stalled")
+
     def _add_trigger(self, found: Trigger) -> None:
+        if self.experiment is not None and found.reason in self.EXPERIMENT_STOP_REASONS:
+            stop = found.time_ns / 1e9 + 1.0
+            if self.experiment.stop_ts is None or stop < self.experiment.stop_ts:
+                self.experiment.stop_ts = stop
+                self.experiment.meta["stopped_by"] = f"{found.reason}: {found.detail}"[:200]
         post = int(self.settings.post_s * self._rate_hz)
         limit = int(self.settings.max_window_s * self._rate_hz)
         if self.pending is None:

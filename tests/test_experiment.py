@@ -121,3 +121,29 @@ def test_recorder_starts_one_experiment_per_live_goal_and_ignores_replays(tmp_pa
     assert start[1] == "goal-1" and start[2] == "auto:jtc_goal" and start[3] == pytest.approx(now - 1.2)
     assert start[4]["intent"] == "去位姿 home"
     assert box.calls[1][1] == pytest.approx(now + 0.5)
+
+
+def test_drive_fault_ends_a_running_experiment_and_csv_export(tmp_path):
+    pytest.importorskip("mcap")
+    from runtime_log.export import mcap_to_csv
+
+    fields = FIELDS + ["left_joint1/status_word"]
+    writer = PyWriter(tmp_path / "seg", fields, slots=8000)
+    events = []
+    box = BlackBox(writer.path, tmp_path / "run" / "blackbox", Settings(stall_s=3600, pre_s=1, post_s=0.2), on_event=events.append)
+    for k in range(1500):
+        writer.write([0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0x1637], time_ns=BASE_NS + (k + 1) * 1_000_000)
+    box._step(final=False)
+    box.start_experiment("goal-x", "auto:jtc_goal", (BASE_NS + 1400 * 1_000_000) / 1e9)  # no goal end will come
+    box._step(final=False)
+    for k in range(1500, 4000):
+        word = 0x1637 if k < 2000 else 0x1208  # fault at cycle 2001
+        writer.write([0.0, 0.0, 0.0, 0.0, 0.0, 0.0, word], time_ns=BASE_NS + (k + 1) * 1_000_000)
+    box._step(final=False)
+    saved = [e for e in events if e["kind"] == "experiment_saved"]
+    assert saved, "experiment must end 1 s after the drive fault"
+    meta = json.loads((tmp_path / "run" / "experiments" / saved[0]["dir"] / "meta.json").read_text())
+    assert meta["last_seq"] == 3001 and meta["meta"]["stopped_by"].startswith("drive_fault")
+    text = mcap_to_csv(tmp_path / "run" / "experiments" / saved[0]["dir"] / "data.mcap").decode("utf-8-sig")
+    lines = text.splitlines()
+    assert lines[0].startswith("time_s,seq,period_us,left_joint1/position") and len(lines) == 1 + meta["cycles"]

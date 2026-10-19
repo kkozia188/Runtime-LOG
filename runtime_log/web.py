@@ -16,13 +16,14 @@ from urllib.parse import parse_qs, unquote, urlparse
 from .archive import INDEX, RUN_FILE, Archive, read_json
 from . import live
 from .compare import render_compare
+from .export import mcap_to_csv
 from .experiment_report import render_experiment, render_experiment_compare
 from .recorder import load_run
 from .report import CSS, RESULT_COLOR, RESULT_LABEL, fmt_s, fmt_time, render
 
 LOG = logging.getLogger("runtime_log.web")
-EXPERIMENT_FILES = {"data.mcap", "meta.json", "plot.json"}
-BLACKBOX_FILES = {"window.mcap", "trigger.json", "kernel.log", "timeline.json"}
+EXPERIMENT_FILES = {"data.mcap", "data.csv", "meta.json", "plot.json"}
+BLACKBOX_FILES = {"window.mcap", "window.csv", "trigger.json", "kernel.log", "timeline.json"}
 RUN_FILES = {"report.html", "run.json", "events.jsonl", "resources.jsonl", "ethercat.jsonl", "launch.log.gz"}
 
 
@@ -99,6 +100,19 @@ class Handler(BaseHTTPRequestHandler):
         if not head:
             self.wfile.write(body)
 
+    def _send_csv(self, source: Path, filename: str, head: bool) -> None:
+        if not source.is_file():
+            self._send(404, b"not found", "text/plain", head)
+            return
+        body = mcap_to_csv(source)
+        self.send_response(200)
+        self.send_header("Content-Type", "text/csv; charset=utf-8")
+        self.send_header("Content-Disposition", f'attachment; filename="{filename}"')
+        self.send_header("Content-Length", str(len(body)))
+        self.end_headers()
+        if not head:
+            self.wfile.write(body)
+
     def _route(self, head: bool) -> None:
         path = unquote(urlparse(self.path).path)
         parts = [part for part in path.split("/") if part]
@@ -169,10 +183,16 @@ class Handler(BaseHTTPRequestHandler):
                 plot = read_json(exp_dir / "plot.json", {})
                 self._send(200, render_experiment(run_id, meta, plot).encode(), "text/html; charset=utf-8", head)
                 return
+            if name == "data.csv":
+                self._send_csv(exp_dir / "data.mcap", f"{run_id}-{parts[2]}.csv", head)
+                return
             kinds = {"data.mcap": "application/octet-stream", "meta.json": "application/json", "plot.json": "application/json"}
             self._send(200, (exp_dir / name).read_bytes(), kinds[name], head)
             return
         if len(parts) == 4 and parts[1] == "blackbox" and parts[3] in BLACKBOX_FILES and not parts[2].startswith(".") and "/" not in parts[2]:
+            if parts[3] == "window.csv":
+                self._send_csv(run_dir / "blackbox" / parts[2] / "window.mcap", f"{run_id}-{parts[2]}.csv", head)
+                return
             target = run_dir / "blackbox" / parts[2] / parts[3]
             if not target.is_file():
                 self._send(404, b"not found", "text/plain", head)

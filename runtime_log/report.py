@@ -322,7 +322,7 @@ def blackbox_section(run: dict, events: list[Event], t0: float) -> str:
     saved = [e for e in events if e.rule == "blackbox_saved"]
     saved_rows = "".join(
         f'<tr class="hit"><td class="num">{e.ts - t0:.3f}</td><td>{esc(", ".join(e.data.get("reasons", [])))}</td><td class="mono">{esc(e.message[:200])}</td>'
-        f'<td><a href="blackbox/{esc(e.data.get("dir"))}/window.mcap">window.mcap</a> · <a href="blackbox/{esc(e.data.get("dir"))}/trigger.json">trigger.json</a>'
+        f'<td><a href="blackbox/{esc(e.data.get("dir"))}/window.mcap">window.mcap</a> · <a href="blackbox/{esc(e.data.get("dir"))}/window.csv">CSV</a> · <a href="blackbox/{esc(e.data.get("dir"))}/trigger.json">trigger.json</a>'
         f' · <a href="blackbox/{esc(e.data.get("dir"))}/kernel.log">kernel.log</a> · <a href="blackbox/{esc(e.data.get("dir"))}/timeline.json">timeline.json</a></td></tr>'
         for e in saved
     )
