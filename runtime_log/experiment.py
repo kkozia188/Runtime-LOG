@@ -25,7 +25,8 @@ class MetricSettings:
     settle_tolerance_deg: float = 0.05
     settle_hold_s: float = 0.1
     jitter_window_s: float = 0.5
-    moving_epsilon_rad: float = 1e-7
+    # ~2 encoder counts on the bench (2^19 counts/rev): smaller steps are feedback noise of a held target.
+    moving_epsilon_rad: float = 2e-5
     max_plot_points: int = 1500
 
 
@@ -36,6 +37,7 @@ class JointSeries:
     target: array = field(default_factory=lambda: array("d"))
     velocity: array = field(default_factory=lambda: array("d"))
     torque: array = field(default_factory=lambda: array("d"))
+    status: array = field(default_factory=lambda: array("d"))
 
 
 def joint_fields(fields: list[str]) -> dict[str, dict[str, int]]:
@@ -43,7 +45,7 @@ def joint_fields(fields: list[str]) -> dict[str, dict[str, int]]:
     joints: dict[str, dict[str, int]] = {}
     for index, name in enumerate(fields):
         joint, _, interface = name.rpartition("/")
-        if interface in ("position", "target_position", "velocity", "torque_permille"):
+        if interface in ("position", "target_position", "velocity", "torque_permille", "status_word"):
             joints.setdefault(joint, {})[interface] = index
     return {joint: idx for joint, idx in joints.items() if "position" in idx and "target_position" in idx}
 
@@ -103,6 +105,7 @@ class Experiment:
             series.target.append(values[idx["target_position"]])
             series.velocity.append(values[idx["velocity"]] if "velocity" in idx else math.nan)
             series.torque.append(values[idx["torque_permille"]] if "torque_permille" in idx else math.nan)
+            series.status.append(values[idx["status_word"]] if "status_word" in idx else math.nan)
 
     def finish(self, settings: Optional[MetricSettings] = None) -> dict:
         settings = settings or MetricSettings()
@@ -139,7 +142,26 @@ def _rms(values) -> float:
     return math.sqrt(sum(v * v for v in values) / len(values)) if values else math.nan
 
 
+def _enabled(word: float) -> bool:
+    return word == word and (int(word) & 0x6F) == 0x27
+
+
+def truncate_at_disable(series: JointSeries) -> tuple[JointSeries, Optional[float]]:
+    """Metrics only cover cycles while the drive follows: cut at the first cycle it leaves
+    Operation Enabled (fault, quick stop, disable) if it was enabled at the start."""
+    if not series.status or not _enabled(series.status[0]):
+        return series, None
+    for i, word in enumerate(series.status):
+        if not _enabled(word):
+            cut = JointSeries()
+            for name in ("times", "position", "target", "velocity", "torque", "status"):
+                getattr(cut, name).extend(getattr(series, name)[:i])
+            return cut, series.times[i]
+    return series, None
+
+
 def joint_metrics(series: JointSeries, settings: MetricSettings) -> dict:
+    series, left_at = truncate_at_disable(series)
     n = len(series.times)
     if n == 0:
         return {"samples": 0}
@@ -147,6 +169,8 @@ def joint_metrics(series: JointSeries, settings: MetricSettings) -> dict:
     target = series.target
     moving_index = [i for i in range(1, n) if abs(target[i] - target[i - 1]) > settings.moving_epsilon_rad]
     out: dict = {"samples": n, "moved": bool(moving_index)}
+    if left_at is not None:
+        out["left_operation_enabled_at_s"] = round(left_at - series.times[0], 4)
     finite = [abs(e) for e in error if e == e]
     if finite:
         worst = max(range(n), key=lambda i: abs(error[i]) if error[i] == error[i] else -1)

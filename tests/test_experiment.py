@@ -147,3 +147,32 @@ def test_drive_fault_ends_a_running_experiment_and_csv_export(tmp_path):
     text = mcap_to_csv(tmp_path / "run" / "experiments" / saved[0]["dir"] / "data.mcap").decode("utf-8-sig")
     lines = text.splitlines()
     assert lines[0].startswith("time_s,seq,period_us,left_joint1/position") and len(lines) == 1 + meta["cycles"]
+
+
+def test_metrics_stop_at_the_fault_and_ignore_held_target_noise():
+    from runtime_log.experiment import JointSeries, MetricSettings, joint_metrics
+
+    series = JointSeries()
+    for k in range(3000):
+        t = k / 1000.0
+        target = min(0.05, 0.1 * t)  # 0.5 s ramp to 0.05 rad
+        enabled = k < 1500
+        noise = 1.2e-5 * (k % 2)  # one encoder count of jitter, as a held target shows
+        series.times.append(t)
+        series.target.append(target if enabled else 1.0 + noise)
+        series.position.append(target if enabled else -3.14159)  # invalid data after the fault
+        series.velocity.append(0.0)
+        series.torque.append(0.0)
+        series.status.append(0x1637 if enabled else 0x1208)
+    metrics = joint_metrics(series, MetricSettings())
+    assert metrics["samples"] == 1500 and metrics["left_operation_enabled_at_s"] == 1.5
+    assert metrics["max_error_deg"] < 1e-6  # the garbage after the fault is not counted
+    assert metrics["travel_deg"] == pytest.approx(math.degrees(0.05), rel=1e-3)
+    static = JointSeries()
+    for k in range(1000):
+        static.times.append(k / 1000.0)
+        static.target.append(0.5 + 1.2e-5 * (k % 2))
+        static.position.append(0.5)
+        static.velocity.append(0.0)
+        static.torque.append(0.0)
+    assert joint_metrics(static, MetricSettings())["moved"] is False
