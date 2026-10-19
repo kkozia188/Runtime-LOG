@@ -36,14 +36,26 @@ traj_external_point_ptr_->update(*new_external_msg);
 约 0.6 µs/点；1000 点以内被周期余量吸收，约 1500 点以上超出 1 ms。台架 8.4 ms 约对应 13000–14000 点；
 同一运行的 goal-3（17 s 轨迹）开始周期 1225 µs，约 2000 点，没有引发故障。
 
-## 建议
+## 建议与处理
 
-1. 立即（使用约束）：发给 `left_arm_jtc` 的单条轨迹控制在 1000 点以内（例如 10–50 ms 间隔，JTC 在点间做样条插值）；
-   长轨迹分段发送或改用流式的 rolling_trajectory_controller。
-2. 修复（robot_driver 给 vendor ros2_controllers 加补丁）：把 `fill_partial_goal` 与 `sort_to_local_joint_order` 移到
-   非实时的目标/话题回调里（写入实时缓冲区之前），`update()` 只交换指针；并在 goal 回调里拒绝超过上限点数的轨迹（可配置）。
-   新版 ros2_controllers 已把这两步放在非实时路径，可参照回移。
-3. 关注：Humble `ros2_control_node` 超时后连续补跑周期，会在 EtherCAT 上产生连发；可评估超时后重新对齐节拍。
+1. 使用约束：发给 `left_arm_jtc` 的单条轨迹不超过 1000 点，按 10–50 ms 的间隔取点即可，JTC 会在点之间做样条插值。
+   长轨迹分段发送，或者改用流式的 rolling_trajectory_controller。
+2. **已修复（robot_driver #97，补丁 `patches/ros2_controllers/0004-limit-trajectory-points.patch`）**：
+   - JTC 新增参数 `max_trajectory_points`，默认 2000，由用户指定。
+   - 超过上限的轨迹由 `validate_trajectory_msg` 拒绝。拒绝发生在非实时的话题回调和 goal 回调里，控制器日志写明原因。
+   - mock 实测：
+
+     | 点数 | 结果 | 最长周期 |
+     | --- | --- | --- |
+     | 2001 / 3000 / 30000 | 拒绝 | ≤ 1005 µs |
+     | 2000 | 接受 | 新轨迹到达的那个周期大约 1.17 ms（超出约 170 µs，没有补跑突发） |
+     | 1000 | 接受 | 1004 µs |
+
+   - 需要每个周期都不超时的运动方，仍应按第 1 条控制在 1000 点以内。
+   - 没有把 `fill_partial_goal` 和 `sort_to_local_joint_order` 移出实时线程。原因如下：
+     - 上游 humble、jazzy 和 master 分支都还在实时线程里做这两步。PR #68（2020）是有意把它们放进实时线程的，没有可以参照的新版实现。
+     - 只移这两步，仍然无法覆盖首个周期的其他开销（释放旧轨迹、采样）。
+3. 待关注：Humble 的 `ros2_control_node` 超时后会连续补跑落下的周期，在 EtherCAT 上产生连发。可以评估超时后重新对齐节拍。
 
 ## Runtime-LOG 侧的改进（本次）
 
