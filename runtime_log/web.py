@@ -17,12 +17,14 @@ from .archive import INDEX, RUN_FILE, Archive, read_json
 from . import live
 from .compare import render_compare
 from .export import mcap_to_csv
+from .waveform import waveform
 from .experiment_report import render_experiment, render_experiment_compare
 from .recorder import load_run
 from .report import CSS, RESULT_COLOR, RESULT_LABEL, fmt_s, fmt_time, render
 
 LOG = logging.getLogger("runtime_log.web")
-EXPERIMENT_FILES = {"data.mcap", "data.csv", "meta.json", "plot.json"}
+WAVEFORM_LOCK = threading.BoundedSemaphore(1)
+EXPERIMENT_FILES = {"data.mcap", "data.csv", "meta.json", "plot.json", "waveform.json"}
 BLACKBOX_FILES = {"window.mcap", "window.csv", "trigger.json", "kernel.log", "timeline.json"}
 RUN_FILES = {"report.html", "run.json", "events.jsonl", "resources.jsonl", "ethercat.jsonl", "launch.log.gz"}
 
@@ -182,6 +184,27 @@ class Handler(BaseHTTPRequestHandler):
                 meta = read_json(exp_dir / "meta.json", {})
                 plot = read_json(exp_dir / "plot.json", {})
                 self._send(200, render_experiment(run_id, meta, plot).encode(), "text/html; charset=utf-8", head)
+                return
+            if name == "waveform.json":
+                source = exp_dir / "data.mcap"
+                if not source.is_file():
+                    self._send(404, "实验数据尚未归档或已被清理".encode(), "text/plain; charset=utf-8", head)
+                    return
+                if not WAVEFORM_LOCK.acquire(blocking=False):
+                    self._send(503, "正在读取其他波形，请稍后重试".encode(), "text/plain; charset=utf-8", head)
+                    return
+                try:
+                    query = parse_qs(urlparse(self.path).query)
+                    end = query.get("end", [None])[0]
+                    data = waveform(source, query.get("joint", [""])[0],
+                                    float(query.get("start", [0])[0]),
+                                    float(end) if end is not None else None,
+                                    int(query.get("width", [1000])[0]))
+                    self._send(200, json.dumps(data, allow_nan=False).encode(), "application/json", head)
+                except ValueError as exc:
+                    self._send(400, str(exc).encode(), "text/plain; charset=utf-8", head)
+                finally:
+                    WAVEFORM_LOCK.release()
                 return
             if name == "data.csv":
                 self._send_csv(exp_dir / "data.mcap", f"{run_id}-{parts[2]}.csv", head)
