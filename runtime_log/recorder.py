@@ -106,9 +106,15 @@ class RunRecorder:
         self.proc_period = 1.0 / proc_hz if proc_hz > 0 else None
 
         cmdline = proc.cmdline(launch_pid)
-        environ = proc.environ(launch_pid)
+        environ = proc.environ_or_none(launch_pid)
         self.args = launch_args(cmdline)
-        self.domain = environ.get("ROS_DOMAIN_ID", "0")
+        if environ is not None:
+            self.domain, self.domain_source = environ.get("ROS_DOMAIN_ID", "0"), "environ"
+        else:  # environment hidden from this user: take the host's declared domain, never guess 0
+            fallback = profile.run.get("domain_fallback")
+            self.domain = str(fallback) if fallback is not None else "?"
+            self.domain_source = "host.yaml" if fallback is not None else "unknown"
+            environ = {}
         self.scope = self.args.get(profile.run.get("scope_arg", "control_scope"), "")
         self.start = self.clock()
         self.events: list[Event] = []
@@ -153,6 +159,7 @@ class RunRecorder:
             "start": self.start,
             "end": None,
             "domain": self.domain,
+            "domain_source": self.domain_source,
             "scope": self.scope,
             "launch_pid": launch_pid,
             "launch_cmdline": cmdline,

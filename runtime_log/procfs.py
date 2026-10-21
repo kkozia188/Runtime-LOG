@@ -119,9 +119,16 @@ class ProcFS:
         return [part.decode(errors="replace") for part in raw.split(b"\0") if part]
 
     def environ(self, pid: int) -> dict:
+        return self.environ_or_none(pid) or {}
+
+    def environ_or_none(self, pid: int) -> Optional[dict]:
+        """None when the kernel refuses the read: a process with capabilities the reader lacks
+        (e.g. ambient CAP_SYS_NICE) hides its environment even from the same user."""
         try:
             raw = self.root.joinpath(str(pid), "environ").read_bytes()
-        except (FileNotFoundError, ProcessLookupError, PermissionError):
+        except PermissionError:
+            return None
+        except (FileNotFoundError, ProcessLookupError):
             return {}
         result = {}
         for item in raw.split(b"\0"):

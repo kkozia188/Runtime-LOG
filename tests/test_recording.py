@@ -46,7 +46,14 @@ class FakeProc:
                     str(self.artifact_dir / "controllers.yaml"), "-p", "update_rate:=1000"]
         return ["bash"]
 
+    hidden_environ = False  # a launch with capabilities the reader lacks (chassis: ambient CAP_SYS_NICE)
+
     def environ(self, pid):
+        return self.environ_or_none(pid) or {}
+
+    def environ_or_none(self, pid):
+        if self.hidden_environ:
+            return None
         return {"ROS_DOMAIN_ID": "77", "RMW_IMPLEMENTATION": "rmw_fastrtps_cpp", "HOME": "/home/ar"}
 
     def pids(self):
@@ -264,7 +271,7 @@ def test_console_audit_lines_of_this_domain_join_the_timeline(tmp_path, profile,
     (log_dir / "launch.log").write_text(lines)
     start = float(lines.split(" ", 1)[0])
     proc = FakeProc(artifact_dir)
-    monkeypatch.setattr(proc, "environ", lambda pid: {"ROS_DOMAIN_ID": "77", "HOME": str(home)})
+    monkeypatch.setattr(proc, "environ_or_none", lambda pid: {"ROS_DOMAIN_ID": "77", "HOME": str(home)})
     entries = [
         {"ts": start - 100, "domain": "77", "action": "login", "ok": True},  # before the run
         {"ts": start + 10, "domain": "91", "action": "enable", "args": {"enabled": True}, "ok": True},  # other stack
@@ -435,3 +442,35 @@ def test_derived_events_survive_a_service_restart(tmp_path, profile, artifact_di
     assert [e.rule for e in second.events if e.kind in ("state", "blackbox")] == ["state_phase", "blackbox_saved"]
     third = RunRecorder(LAUNCH_PID, log_dir, profile, archive, proc, None)  # restored events are not duplicated
     assert len([e for e in third.events if e.kind in ("state", "blackbox")]) == 2
+
+
+def test_hidden_launch_environment_uses_the_host_domain_never_zero(tmp_path, profile, artifact_dir):
+    import dataclasses
+
+    log_dir = tmp_path / f"x-{LAUNCH_PID}"
+    log_dir.mkdir()
+    (log_dir / "launch.log").write_text((FIXTURES / "launch_normal.log").read_text())
+    proc = FakeProc(artifact_dir)
+    proc.hidden_environ = True
+    unknown = RunRecorder(LAUNCH_PID, log_dir, profile, Archive(tmp_path / "a"), proc, None)
+    assert unknown.domain == "?" and unknown.document["domain_source"] == "unknown" and "-dx-" in unknown.id
+    host = dataclasses.replace(profile, run={**profile.run, "domain_fallback": 173})
+    declared = RunRecorder(LAUNCH_PID, log_dir, host, Archive(tmp_path / "b"), proc, None)
+    assert declared.domain == "173" and declared.document["domain_source"] == "host.yaml" and "-d173-" in declared.id
+    proc.hidden_environ = False
+    readable = RunRecorder(LAUNCH_PID, log_dir, host, Archive(tmp_path / "c"), proc, None)
+    assert readable.domain == "77" and readable.document["domain_source"] == "environ"
+
+
+def test_procfs_distinguishes_a_refused_environment(tmp_path):
+    from runtime_log.procfs import ProcFS
+
+    (tmp_path / "10").mkdir()
+    (tmp_path / "10/environ").write_bytes(b"ROS_DOMAIN_ID=5\0HOME=/x\0")
+    (tmp_path / "11").mkdir()
+    (tmp_path / "11/environ").write_bytes(b"A=1\0")
+    (tmp_path / "11/environ").chmod(0)
+    proc = ProcFS(tmp_path)
+    assert proc.environ_or_none(10) == {"ROS_DOMAIN_ID": "5", "HOME": "/x"}
+    assert proc.environ_or_none(11) is None and proc.environ(11) == {}
+    assert proc.environ_or_none(12) == {}  # process gone: empty, not refused

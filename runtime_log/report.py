@@ -373,7 +373,8 @@ def render(run: dict, events: list[Event], run_dir: Optional[Path] = None) -> st
         ("开始", fmt_time(run.get("start"))),
         ("时长", fmt_s(summary.get("duration_s"))),
         ("就绪耗时", fmt_s(summary.get("ready_s"))),
-        ("ROS_DOMAIN_ID", run.get("domain")),
+        ("ROS_DOMAIN_ID", f'{run.get("domain")}（来自主机配置）' if run.get("domain_source") == "host.yaml"
+         else run.get("domain")),
         ("scope", run.get("scope") or selection.get("control_scope")),
         ("硬件", run.get("hardware")),
         ("机器单元", selection.get("machine_unit")),
