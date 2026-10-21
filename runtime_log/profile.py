@@ -42,6 +42,8 @@ class Profile:
     git_repos: list[str] = field(default_factory=list)
     process_order: list[str] = field(default_factory=list)
     blackbox: dict = field(default_factory=dict)
+    # This station (host overlay only): display name and links to the stations of other IPCs.
+    station: dict = field(default_factory=dict)
 
     def classify(self, line: LogLine) -> list[Event]:
         """Events for one launch.log line: process lifecycle, rule hits, and unmatched WARN/ERROR."""
@@ -73,8 +75,21 @@ class Profile:
 _KINDS = {"stages": STAGE, "failures": FAILURE, "shutdown": SHUTDOWN, "controls": CONTROL}
 
 
-def load_profile(path: str | Path) -> Profile:
+def merge(base, overlay):
+    """Overlay wins; mappings merge recursively, every other value (lists included) is replaced."""
+    if isinstance(base, dict) and isinstance(overlay, dict):
+        merged = dict(base)
+        for key, value in overlay.items():
+            merged[key] = merge(base.get(key), value) if key in base else value
+        return merged
+    return overlay
+
+
+def load_profile(path: str | Path, host_path: Optional[str | Path] = None) -> Profile:
+    """Project profile, optionally overlaid by a per-IPC host file (paths, expected codes, station)."""
     document = yaml.safe_load(Path(path).read_text(encoding="utf-8"))
+    if host_path is not None and Path(host_path).is_file():
+        document = merge(document, yaml.safe_load(Path(host_path).read_text(encoding="utf-8")) or {})
     rules: list[Rule] = []
     # Failures first: a line that reports a failure must not be read as a stage.
     for section in ("failures", "shutdown", "stages", "controls"):
@@ -101,4 +116,5 @@ def load_profile(path: str | Path) -> Profile:
         git_repos=list(document.get("git_repos", []) or []),
         process_order=list(document.get("process_order", []) or []),
         blackbox=document.get("blackbox", {}) or {},
+        station=document.get("station", {}) or {},
     )

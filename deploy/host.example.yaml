@@ -1,0 +1,24 @@
+# Per-IPC overlay of profiles/rt_control.yaml. Install as ~/.config/runtime-log/host.yaml
+# (or pass --host-config). Mappings merge into the profile; lists and scalars replace it.
+# Only host facts belong here; project rules (stages, triggers, enums) stay in the profile.
+
+# Example: Advantech chassis bench (Alfa_V3-Advantech-01, 192.168.100.28).
+station:
+  name: 底盘台架 192.168.100.28
+  peers:
+    - name: 机械臂台架 192.168.100.40
+      url: http://192.168.100.40:18200/
+
+git_repos:
+  - ~/Robot/rt-control/v3/robot_driver
+
+run:
+  # The chassis operator web writes no audit log yet; a missing file is ignored.
+  console_audit: ~/.ros/log/rt_control_operator_web/audit.jsonl
+
+ethercat:
+  post_stop:
+    # Kinco FD drives report the slave name "FD Drive".
+    drive_name_regex: 'ZeroErr|Kinco|FD Drive|Driver'
+    expected_codes: []
+    error_codes: {}

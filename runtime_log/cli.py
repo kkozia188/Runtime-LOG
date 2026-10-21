@@ -16,6 +16,7 @@ from .recorder import load_run
 from .report import write_report
 
 DEFAULT_PROFILE = Path(__file__).resolve().parent.parent / "profiles" / "rt_control.yaml"
+DEFAULT_HOST = Path(os.environ.get("RUNTIME_LOG_HOST_CONFIG", "~/.config/runtime-log/host.yaml")).expanduser()
 DEFAULT_ARCHIVE = Path(os.environ.get("RUNTIME_LOG_ARCHIVE", "~/runtime-log/runs")).expanduser()
 
 
@@ -32,6 +33,8 @@ def main(argv=None) -> int:
     parser = argparse.ArgumentParser(prog="runtime-log", description="Run recorder for RT-Control (passive, read-only).")
     parser.add_argument("--archive", type=Path, default=DEFAULT_ARCHIVE)
     parser.add_argument("--profile", type=Path, default=DEFAULT_PROFILE)
+    parser.add_argument("--host-config", type=Path, default=DEFAULT_HOST,
+                        help="per-IPC overlay of the profile (ignored when missing)")
     parser.add_argument("--retention-days", type=float, default=7.0)
     parser.add_argument("--min-free-gb", type=float, default=10.0)
     parser.add_argument("-v", "--verbose", action="store_true")
@@ -70,7 +73,7 @@ def main(argv=None) -> int:
     args = parser.parse_args(argv)
     logging.basicConfig(level=logging.DEBUG if args.verbose else logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
     archive = Archive(args.archive, args.retention_days, args.min_free_gb)
-    profile = load_profile(args.profile)
+    profile = load_profile(args.profile, args.host_config)
 
     if args.command == "serve":
         from .service import Service
@@ -86,7 +89,7 @@ def main(argv=None) -> int:
             write_report(run_dir, *load_run(run_dir))
 
         if not args.no_web:
-            serve_web(archive, args.host, args.port, profile.blackbox.get("enums", {}))
+            serve_web(archive, args.host, args.port, profile.blackbox.get("enums", {}), profile.station)
         Service(profile, archive, poller=poller, ethercat_hz=args.ethercat_hz, proc_hz=args.proc_hz, on_finish=on_finish).run_forever()
         return 0
 

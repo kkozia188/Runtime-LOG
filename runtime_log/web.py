@@ -33,7 +33,17 @@ def esc(value) -> str:
     return html.escape("" if value is None else str(value))
 
 
-def render_index(index: dict) -> str:
+def station_header(station: Optional[dict]) -> tuple[str, str]:
+    """(title suffix, links to the stations of the other IPCs) from the host overlay."""
+    station = station or {}
+    name = f" · {esc(station['name'])}" if station.get("name") else ""
+    peers = [p for p in station.get("peers") or [] if p.get("url", "").startswith(("http://", "https://"))]
+    links = " ".join(f'<a href="{esc(p["url"])}">{esc(p.get("name") or p["url"])} →</a>' for p in peers)
+    return name, (f'<p class="k">其他工控机：{links}</p>' if links else "")
+
+
+def render_index(index: dict, station: Optional[dict] = None) -> str:
+    title, peers = station_header(station)
     runs = index.get("runs", [])
     usage = index.get("usage", {})
     rows = []
@@ -66,7 +76,7 @@ def render_index(index: dict) -> str:
     free_gb = (usage.get("disk_free_bytes") or 0) / 1024**3
     return f"""<!doctype html><html lang="zh-CN"><head><meta charset="utf-8">{refresh}<meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Runtime-LOG</title><style>{CSS}</style></head><body><main style="max-width:1600px">
-<h1>Runtime-LOG · 运行记录 <a href="/live" style="font-size:14px">实时状态 →</a></h1>
+<h1>Runtime-LOG · 运行记录{title} <a href="/live" style="font-size:14px">实时状态 →</a></h1>{peers}
 <p class="k">共 {len(runs)} 次运行 · 归档 {archive_mb:.1f} MiB · 磁盘剩余 {free_gb:.1f} GiB · 保留 7 天 · 只读页面 · 更新于 {fmt_time(index.get("generated"))}</p>
 <div class="filters"><label>结果 <select id="fResult"><option value="">全部</option><option value="failed">失败</option><option value="ok">正常结束</option><option value="running">运行中</option><option value="aborted">未正常结束</option><option value="interrupted">记录中断</option></select></label>
 <label>硬件 <select id="fHw"><option value="">全部</option><option>ethercat</option><option>mock</option></select></label>
@@ -87,6 +97,7 @@ compareBtn.onclick=()=>{{location.href='/compare?a='+encodeURIComponent(picked[0
 class Handler(BaseHTTPRequestHandler):
     archive: Archive
     enums: dict = {}
+    station: dict = {}
     server_version = "Runtime-LOG"
 
     def log_message(self, fmt, *args):  # keep journald quiet
@@ -121,7 +132,7 @@ class Handler(BaseHTTPRequestHandler):
         root = self.archive.root
         if not parts:
             index = read_json(root / INDEX, {"runs": []})
-            self._send(200, render_index(index).encode(), "text/html; charset=utf-8", head)
+            self._send(200, render_index(index, self.station).encode(), "text/html; charset=utf-8", head)
             return
         if parts == ["compare"]:
             query = parse_qs(urlparse(self.path).query)
@@ -263,8 +274,9 @@ class Handler(BaseHTTPRequestHandler):
     do_POST = do_PUT = do_DELETE = do_PATCH = _refuse
 
 
-def serve(archive: Archive, host: str, port: int, enums: Optional[dict] = None) -> ThreadingHTTPServer:
-    handler = type("BoundHandler", (Handler,), {"archive": archive, "enums": enums or {}})
+def serve(archive: Archive, host: str, port: int, enums: Optional[dict] = None,
+          station: Optional[dict] = None) -> ThreadingHTTPServer:
+    handler = type("BoundHandler", (Handler,), {"archive": archive, "enums": enums or {}, "station": station or {}})
     server = ThreadingHTTPServer((host, port), handler)
     server.daemon_threads = True
     thread = threading.Thread(target=server.serve_forever, name="runtime-log-web", daemon=True)

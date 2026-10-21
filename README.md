@@ -105,6 +105,31 @@ journalctl --user -u runtime-log -f
 
 额外参数写在 `~/.config/runtime-log.env`：`RUNTIME_LOG_SERVE_ARGS=--ethercat-hz 0`。
 
+### 每台工控机一个站
+
+同一套引擎和项目配置，部署到每台控制工控机，各自归档、各自在 `:18200` 提供页面。机械臂和底盘以后由同一台工控机控制时，
+那台的站会同时记录两者，不需要改引擎。
+
+只有主机相关的事实写进 `~/.config/runtime-log/host.yaml`（示例 `deploy/host.example.yaml`）。启动时它会合并到
+`profiles/rt_control.yaml` 上：映射逐层合并，列表和数值直接替换。可以写的内容：
+
+- 站点名和其他站点的链接（`station`），显示在首页；
+- 代码仓库路径（`git_repos`）；
+- 操作台审计日志路径；
+- 停机后读错误码的驱动名匹配和预期错误码。
+
+阶段规则、触发器、枚举仍只写在项目配置里。
+
+控制栈和记录服务都以普通用户运行。主站设备按 udev 规则 `KERNEL=="EtherCAT[0-9]*", MODE="0660", GROUP="realtime"`
+授权给 `realtime` 组。用户刚加入该组、用户级 systemd 还没重新登录时，可用 drop-in 让服务带上该组启动：
+
+```ini
+# ~/.config/systemd/user/runtime-log.service.d/realtime.conf
+[Service]
+ExecStart=
+ExecStart=/usr/bin/sg realtime -c "exec /usr/bin/python3 -m runtime_log --archive %h/runtime-log/runs serve --host 0.0.0.0 --port 18200 ${RUNTIME_LOG_SERVE_ARGS}"
+```
+
 ## 存档
 
 `~/runtime-log/runs/<YYYYmmdd-HHMMSS>-d<域>-<scope>/`：
