@@ -43,6 +43,25 @@ ethercat:
 # Enum fields written by instrumented controllers (enable_manager runtime_log_trace). Values are
 # the C++ enum order; every change becomes a timeline event, listed names also save a window.
 blackbox:
+  # Edge triggers by state-interface name; only segments that carry the interface are affected
+  # (today: the chassis Kinco adapter and CANopen steering encoders). Thresholds are first values
+  # from the chassis configuration and must be checked against recorded healthy runs.
+  interface_triggers:
+    - interface: mode_request_error      # Kinco cyclic adapter fail-closed latch (robot_hw_ethercat README)
+      when: rises_above
+      threshold: 0.5
+      reason: drive_adapter_error
+      explained_by: shutdown
+    - interface: feedback_age_ms         # Kinco axes (1 ms PDO) and BRT encoders (4 ms SYNC); controller stops at 200 ms
+      when: rises_above
+      threshold: 20
+      reason: feedback_stale
+      explained_by: shutdown
+    - interface: ready                   # CANopen steering encoder lost its ready state
+      when: falls_below
+      threshold: 0.5
+      reason: sensor_not_ready
+      explained_by: shutdown
   enums:
     phase:
       title: 使能状态机

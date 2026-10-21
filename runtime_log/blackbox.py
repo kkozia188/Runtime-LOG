@@ -68,6 +68,9 @@ class Settings:
     experiment_max_s: float = 600.0
     # {field: {title, names, labels, trigger}} for enum fields of instrumented controllers.
     enums: dict = field(default_factory=dict)
+    # Edge triggers on any state interface by suffix (profile `blackbox.interface_triggers`):
+    # {interface, when: rises_above|falls_below, threshold, reason, explained_by: shutdown|disable|never}.
+    interface_triggers: list = field(default_factory=list)
 
 
 def enum_name(spec: dict, number: float) -> tuple[str, str]:
@@ -90,6 +93,16 @@ class TriggerScanner:
         self.responding = index.get("ethercat_master/slaves_responding")
         self.link = index.get("ethercat_master/link_up")
         self.enums = [(name, index[name], spec) for name, spec in settings.enums.items() if name in index]
+        # (field, index, spec) for every field whose last path element is a configured interface.
+        for spec in settings.interface_triggers:
+            if spec.get("when") not in ("rises_above", "falls_below") or not spec.get("reason") or "interface" not in spec:
+                raise ValueError(f"bad interface trigger {spec!r}: need interface, reason, when rises_above|falls_below")
+            if spec.get("explained_by", "shutdown") not in ("shutdown", "disable", "never"):
+                raise ValueError(f"bad explained_by in interface trigger {spec!r}")
+        self.interface_rules = [
+            (name, i, spec) for spec in settings.interface_triggers for name, i in index.items()
+            if name.rsplit("/", 1)[-1] == spec["interface"]
+        ]
         self.state_events: list[dict] = []  # drained by the black box after each scan
         self.previous: dict[str, float] = {}
         self.nominal_ns: Optional[float] = None
@@ -168,6 +181,18 @@ class TriggerScanner:
             before = self._edge("link", link)
             if before == 1.0 and link != 1.0:
                 add("link_down")
+        for name, i, spec in self.interface_rules:
+            number = value(i)
+            before = self._edge(f"if:{name}", number)
+            limit = float(spec["threshold"])
+            if before is None or number != number or before != before:
+                continue
+            if spec["when"] == "rises_above":
+                crossed = before <= limit < number
+            else:  # falls_below
+                crossed = before >= limit > number
+            if crossed:
+                add(spec["reason"], f"{name} {before:g} -> {number:g}")
         for name, i, spec in self.enums:
             number = value(i)
             before = self._edge(f"enum:{name}", number)
@@ -424,7 +449,11 @@ class BlackBox(threading.Thread):
         t_first = first.time_ns / 1e9
         reasons = sorted({t.reason for t in pending.triggers})
         explanation = self.explain(t_first - 1.0, pending.triggers[-1].time_ns / 1e9 + 2.0)
-        explainable = EXPLAINED_BY_SHUTDOWN if explanation in ("shutdown", "run ended") else EXPLAINED_BY_DISABLE
+        stop = explanation in ("shutdown", "run ended")
+        explainable = set(EXPLAINED_BY_SHUTDOWN if stop else EXPLAINED_BY_DISABLE)
+        for spec in self.settings.interface_triggers:
+            if spec.get("explained_by", "shutdown") == "disable" or (stop and spec.get("explained_by", "shutdown") == "shutdown"):
+                explainable.add(spec["reason"])
         if explanation and set(reasons) <= explainable:
             record = {"time": t_first, "reasons": reasons, "explained_by": explanation}
             self.expected.append(record)

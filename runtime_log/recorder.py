@@ -85,7 +85,10 @@ class RunRecorder:
     ):
         self.launch_pid = launch_pid
         self.shm_dir = shm_dir
-        self.blackbox_settings = blackbox_settings or BlackBoxSettings(enums=profile.blackbox.get("enums", {}) or {})
+        self.blackbox_settings = blackbox_settings or BlackBoxSettings(
+            enums=profile.blackbox.get("enums", {}) or {},
+            interface_triggers=list(profile.blackbox.get("interface_triggers", []) or []),
+        )
         self.blackboxes: dict[str, BlackBox] = {}
         self.goal_count = 0
         self.last_operator: Optional[Event] = None

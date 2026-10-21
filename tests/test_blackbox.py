@@ -180,3 +180,49 @@ def test_reader_rejects_foreign_files(tmp_path):
     path.write_bytes(b"x" * 8192)
     with pytest.raises(ValueError):
         ShmReader(path)
+
+
+CHASSIS = ["wheel1_joint/status_word", "wheel1_joint/mode_request_error", "wheel1_joint/feedback_age_ms",
+           "steering_encoder_1/feedback_age_ms", "steering_encoder_1/ready"]
+
+
+def chassis_cycles(writer, count, error=0.0, wheel_age=1.0, encoder_age=4.0, ready=1.0):
+    for _ in range(count):
+        writer.write([0x1637, error, wheel_age, encoder_age, ready])
+
+
+def test_profile_interface_triggers_on_chassis_fields(tmp_path, profile):
+    pytest.importorskip("mcap")
+    writer = PyWriter(tmp_path / "seg", CHASSIS)
+    box, events = make_box(tmp_path, writer.path, interface_triggers=profile.blackbox["interface_triggers"])
+    chassis_cycles(writer, 1500)
+    box._step(final=False)
+    chassis_cycles(writer, 1, error=1.0, wheel_age=35.0, encoder_age=25.0, ready=0.0)
+    chassis_cycles(writer, 600, error=1.0, wheel_age=35.0, encoder_age=25.0, ready=0.0)
+    box._step(final=True)
+    assert events[-1]["kind"] == "blackbox_saved"
+    assert set(events[-1]["reasons"]) == {"drive_adapter_error", "feedback_stale", "sensor_not_ready"}
+    document = json.loads((tmp_path / "bb" / box.saved[0] / "trigger.json").read_text())
+    details = sorted(t["detail"] for t in document["triggers"] if t["reason"] == "feedback_stale")
+    assert details == ["steering_encoder_1/feedback_age_ms 4 -> 25", "wheel1_joint/feedback_age_ms 1 -> 35"]
+
+
+def test_interface_triggers_are_edges_and_shutdown_explains_them(tmp_path, profile):
+    writer = PyWriter(tmp_path / "seg", CHASSIS)
+    box, events = make_box(tmp_path, writer.path, explain=lambda a, b: "shutdown",
+                           interface_triggers=profile.blackbox["interface_triggers"])
+    chassis_cycles(writer, 1500, encoder_age=30.0)  # already stale at the first cycle: no edge
+    box._step(final=False)
+    assert box.pending is None
+    chassis_cycles(writer, 1, encoder_age=4.0)
+    chassis_cycles(writer, 1, encoder_age=30.0)  # crosses again during a stop
+    chassis_cycles(writer, 600, encoder_age=30.0)
+    box._step(final=True)
+    assert not box.saved and events[-1]["kind"] == "blackbox_expected" and events[-1]["reasons"] == ["feedback_stale"]
+
+
+def test_bad_interface_trigger_is_rejected(tmp_path):
+    writer = PyWriter(tmp_path / "seg", CHASSIS)
+    with pytest.raises(ValueError):
+        make_box(tmp_path, writer.path, interface_triggers=[{"interface": "ready", "when": "below", "threshold": 1,
+                                                             "reason": "x"}])
