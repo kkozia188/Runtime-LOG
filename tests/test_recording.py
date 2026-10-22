@@ -222,7 +222,10 @@ def test_service_restart_reuses_the_run_and_keeps_polled_events(tmp_path, profil
     first.tick(first.start + 2)
     first.flush(first.start + 2)
     first.ecat_out.close()
+    (first.dir / "experiments" / "20261021-000000-goal-361").mkdir(parents=True)
     second = RunRecorder(LAUNCH_PID, log_dir, profile, archive, proc, fake_poller()[0])
+    assert second.goal_count == 361
+    assert second.experiment_post_goal_s == 8.0
     assert second.id == first.id
     assert [e.rule for e in second.events].count("slave_states_polled") == 1
     assert second.counters.high["tx_frames"] == 108821609

@@ -43,6 +43,8 @@ ethercat:
 # Enum fields written by instrumented controllers (enable_manager runtime_log_trace). Values are
 # the C++ enum order; every change becomes a timeline event, listed names also save a window.
 blackbox:
+  # Capture T4 static hold after JTC success; does not command robot motion.
+  experiment_post_goal_s: 8.0
   # Edge triggers by state-interface name; only segments that carry the interface are affected
   # (today: the chassis Kinco adapter and CANopen steering encoders). Thresholds are first values
   # from the chassis configuration and must be checked against recorded healthy runs.

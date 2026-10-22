@@ -90,7 +90,8 @@ def test_segments_without_targets_never_record_experiments(tmp_path):
     assert not box.tracking and box.start_experiment("x", "manual", 0.0) is False
 
 
-def test_recorder_starts_one_experiment_per_live_goal_and_ignores_replays(tmp_path, profile):
+@pytest.mark.parametrize('post_goal_s', [1.0, 8.0])
+def test_recorder_starts_one_experiment_per_live_goal_and_ignores_replays(tmp_path, profile, post_goal_s):
     from runtime_log.recorder import RunRecorder
 
     class Box:
@@ -108,6 +109,7 @@ def test_recorder_starts_one_experiment_per_live_goal_and_ignores_replays(tmp_pa
     recorder = RunRecorder.__new__(RunRecorder)  # only the hook state is needed
     recorder.clock = time.time
     recorder.goal_count = 0
+    recorder.experiment_post_goal_s = post_goal_s
     recorder.last_operator = None
     box = Box()
     recorder._active_boxes = lambda: [box]
@@ -120,7 +122,7 @@ def test_recorder_starts_one_experiment_per_live_goal_and_ignores_replays(tmp_pa
     start = box.calls[0]
     assert start[1] == "goal-1" and start[2] == "auto:jtc_goal" and start[3] == pytest.approx(now - 1.2)
     assert start[4]["intent"] == "去位姿 home"
-    assert box.calls[1][1] == pytest.approx(now + 0.5)
+    assert box.calls[1][1] == pytest.approx(now - 0.5 + post_goal_s)
 
 
 def test_drive_fault_ends_a_running_experiment_and_csv_export(tmp_path):
@@ -176,3 +178,22 @@ def test_metrics_stop_at_the_fault_and_ignore_held_target_noise():
         static.velocity.append(0.0)
         static.torque.append(0.0)
     assert joint_metrics(static, MetricSettings())["moved"] is False
+
+
+def test_eight_second_hold_is_written_to_archive(tmp_path):
+    pytest.importorskip('mcap')
+    writer = PyWriter(tmp_path / 'seg', FIELDS, slots=16000)
+    events = []
+    box = BlackBox(writer.path, tmp_path / 'run/blackbox', Settings(stall_s=3600), on_event=events.append)
+    write_motion(writer, 0, settle=9000)
+    box._step(final=False)
+    goal_end = (BASE_NS + 1500 * 1_000_000) / 1e9
+    box.start_experiment('t4', 'auto:jtc_goal', (BASE_NS + 900 * 1_000_000) / 1e9)
+    box.stop_experiment(goal_end + 8.0)
+    box._step(final=True)
+    saved = [e for e in events if e['kind'] == 'experiment_saved']
+    assert len(saved) == 1
+    meta = json.loads((tmp_path / 'run/experiments' / saved[0]['dir'] / 'meta.json').read_text())
+    assert meta['missing_cycles'] == 0
+    assert meta['end'] == pytest.approx(goal_end + 8.0, abs=.001)
+    assert meta['cycles'] == 8601

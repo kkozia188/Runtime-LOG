@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import gzip
 import json
+import math
 import queue
 import shutil
 import time
@@ -96,6 +97,9 @@ class RunRecorder:
         self.next_attach = 0.0
         self.log_dir = log_dir
         self.profile = profile
+        self.experiment_post_goal_s = float(profile.blackbox.get("experiment_post_goal_s", 1.0))
+        if not math.isfinite(self.experiment_post_goal_s) or self.experiment_post_goal_s < 0:
+            raise ValueError("experiment_post_goal_s must be finite and nonnegative")
         self.archive = archive
         self.proc = proc
         self.poller = poller
@@ -128,6 +132,13 @@ class RunRecorder:
         previous = archive.find_run(ros_log_dir=str(log_dir))
         self.id = previous or archive.unique_id(run_id(self.start, self.domain, self.scope))
         self.dir = archive.run_dir(self.id)
+        # Keep automatic goal labels monotonic across a recorder-only restart.
+        prior_goals = []
+        for path in (self.dir / "experiments").glob("*-goal-*"):
+            suffix = path.name.rsplit("-goal-", 1)[-1]
+            if path.is_dir() and suffix.isdigit():
+                prior_goals.append(int(suffix))
+        self.goal_count = max(prior_goals, default=0)
         # A service restart re-reads launch.log from the start, so events are rebuilt; samples are kept.
         (self.dir / "events.jsonl").unlink(missing_ok=True)
         self.events_out = JsonlWriter(self.dir / "events.jsonl")
@@ -232,7 +243,7 @@ class RunRecorder:
                     if operator and event.ts - operator.ts < 5.0 else None})
         else:
             for box in boxes:
-                box.stop_experiment(event.ts + 1.0)
+                box.stop_experiment(event.ts + self.experiment_post_goal_s)
 
     def manual_experiment(self, action: str, name: str = "") -> int:
         boxes = [box for box in self._active_boxes() if box.tracking]
