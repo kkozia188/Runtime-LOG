@@ -15,6 +15,26 @@ from typing import Optional
 BURST_GAP_US = 500
 
 
+def find_send_trace(pattern: str, start: float, end: float, slack_s: float = 120.0) -> Optional[Path]:
+    """Newest file matching `pattern` (~ expanded, glob) written during [start, end + slack].
+
+    Used when the control process hides its environment (a launch with capabilities the reader
+    lacks), so RT_CONTROL_ECAT_TRACE_FILE cannot be read: the driver writes the trace on stop.
+    """
+    import glob
+    import os
+
+    candidates = []
+    for name in glob.glob(os.path.expanduser(pattern)):
+        try:
+            mtime = os.stat(name).st_mtime
+        except OSError:
+            continue
+        if start <= mtime <= end + slack_s:
+            candidates.append((mtime, name))
+    return Path(max(candidates)[1]) if candidates else None
+
+
 def read_send_trace(path: Path, burst_gap_us: int = BURST_GAP_US) -> Optional[dict]:
     stats_path = Path(f"{path}.stats.csv")
     if not stats_path.exists():

@@ -26,7 +26,7 @@ from .blackbox import BlackBox
 from .blackbox import Settings as BlackBoxSettings
 from .procfs import CpuSampler, ProcFS
 from .profile import Profile
-from .sendtrace import read_send_trace
+from .sendtrace import find_send_trace, read_send_trace
 from .summary_extra import enrich
 from .poststop import read_post_stop
 from .shm import SHM_DIR
@@ -586,6 +586,12 @@ class RunRecorder:
             if not box.reader.writer_alive():
                 box.reader.close()
                 box.path.unlink(missing_ok=True)
+        if not self.document.get("send_trace_path") and self.profile.run.get("send_trace_glob"):
+            # Environment hidden from this user: find the trace the driver wrote on stop (host.yaml).
+            found = find_send_trace(self.profile.run["send_trace_glob"], self.start, self.clock())
+            if found is not None:
+                self.document["send_trace_path"] = str(found)
+                self.document["send_trace_source"] = "host.yaml send_trace_glob"
         if self.document.get("send_trace_path"):
             self.document["send_trace"] = read_send_trace(Path(self.document["send_trace_path"]))
         post_stop = self.profile.ethercat.get("post_stop") or {}

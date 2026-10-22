@@ -16,6 +16,8 @@ run:
   # The chassis stack runs with ambient CAP_SYS_NICE, which hides its /proc environment from this
   # (capability-free) service; the run then takes this domain instead of guessing.
   domain_fallback: "173"
+  # Same reason: RT_CONTROL_ECAT_TRACE_FILE is hidden; the newest trace written during the run is used.
+  send_trace_glob: ~/Robot/rt-control/v3/runs/chassis-*/send_trace.csv
   # The chassis operator web writes no audit log yet; a missing file is ignored.
   console_audit: ~/.ros/log/rt_control_operator_web/audit.jsonl
 
