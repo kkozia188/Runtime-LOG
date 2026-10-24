@@ -114,6 +114,23 @@ def test_continuous_disabled_by_default_and_ui_marks_active(tmp_path):
     box.reader.close()
 
 
+def test_continuous_config_requires_explicit_scope_match(tmp_path, profile):
+    from dataclasses import replace
+    from runtime_log.archive import Archive
+    from runtime_log.recorder import RunRecorder
+    from test_recording import FakeProc, LAUNCH_PID, FIXTURES
+
+    log = tmp_path / 'launch'
+    log.mkdir()
+    (log / 'launch.log').write_text((FIXTURES / 'launch_normal.log').read_text())
+    proc = FakeProc(tmp_path / 'artifact')
+    for scopes, expected in ((['chassis_only'], False), (['bench_left_arm'], True), ([], False)):
+        configured = replace(profile, blackbox={**profile.blackbox, 'continuous_experiments': True,
+                                               'continuous_scopes': scopes})
+        r = RunRecorder(LAUNCH_PID, log, configured, Archive(tmp_path / ('archive-' + str(scopes))), proc, None)
+        assert r.blackbox_settings.continuous_experiments is expected
+
+
 @pytest.mark.parametrize('key,value', [('experiment_max_s', 0), ('experiment_max_s', float('nan')),
                                       ('experiment_min_free_gb', -1)])
 def test_invalid_continuous_settings_rejected(tmp_path, key, value):
