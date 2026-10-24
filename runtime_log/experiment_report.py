@@ -110,8 +110,15 @@ def experiments_on_disk(run_dir: Optional[Path]) -> list[dict]:
 
 def experiments_section(run: dict, run_dir: Optional[Path]) -> str:
     rows = experiments_on_disk(run_dir) or experiments_of(run)
+    active = [box.get('active_experiment') for box in run.get('blackbox') or [] if box.get('active_experiment')]
+    active_note = ''.join(f'<p class="k">正在记录：{esc(e["name"])} · {e["cycles"]} 个采样；'
+                          '分段完成或停栈收尾后显示下载和波形入口。</p>' for e in active)
+    for box in run.get('blackbox') or []:
+        c = box.get('continuous') or {}
+        if c.get('configured') and (c.get('paused') or c.get('disk_ok') is False):
+            active_note += '<p class="warn">持续记录已暂停：手动停止或磁盘余量不足。</p>'
     if not rows:
-        return '<p class="k">没有实验。每次轨迹目标（JTC）会自动记录一次；也可用 <code>runtime-log experiment start/stop</code> 手动记录。</p>'
+        return active_note + '<p class="k">没有已完成的实验。机械臂 JTC 可自动记录，底盘可启用持续分段记录；也可用 <code>runtime-log experiment start/stop</code> 手动记录。</p>'
     t0 = (run.get("summary") or {}).get("t0") or run.get("start") or 0
     body = []
     for row in rows:
@@ -134,7 +141,7 @@ def experiments_section(run: dict, run_dir: Optional[Path]) -> str:
             f'<td class="num">{_value(summary.get("max_overshoot_deg")) if summary.get("tracking_kind") != "velocity" else "—"}</td><td>{esc(", ".join(unsettled))}</td>'
             f'<td><a href="experiments/{esc(row["dir"])}/#waveforms">查看波形</a> · <a href="experiments/{esc(row["dir"])}/data.mcap">data.mcap</a> · <a href="experiments/{esc(row["dir"])}/data.csv">CSV</a></td></tr>'
         )
-    return (EXPERIMENT_PICKER + '<table><tr><th></th><th>t (s)</th><th>实验</th><th>来源</th><th>操作</th><th>时长 s</th><th>运动关节</th><th>最大跟随误差（按类型）</th>'
+    return (active_note + EXPERIMENT_PICKER + '<table><tr><th></th><th>t (s)</th><th>实验</th><th>来源</th><th>操作</th><th>时长 s</th><th>运动关节</th><th>最大跟随误差（按类型）</th>'
             '<th>最慢到位 s</th><th>最大超调 °</th><th>未到位</th><th>数据</th></tr>' + "".join(body) + "</table>")
 
 

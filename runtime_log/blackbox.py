@@ -10,7 +10,9 @@ import bisect
 import collections
 import json
 import logging
+import math
 import queue
+import shutil
 import struct
 import threading
 import time
@@ -66,6 +68,8 @@ class Settings:
     overrun_trigger_factor: float = 3.0  # saves a window (a whole cycle was lost)
     stall_s: float = 0.2
     experiment_max_s: float = 600.0
+    continuous_experiments: bool = False
+    experiment_min_free_gb: float = 10.0
     # {field: {title, names, labels, trigger}} for enum fields of instrumented controllers.
     enums: dict = field(default_factory=dict)
     # Edge triggers on any state interface by suffix (profile `blackbox.interface_triggers`):
@@ -246,12 +250,34 @@ class BlackBox(threading.Thread):
         self.last_head = 0
         self.last_head_change = time.monotonic()
         self.writer_stopped_reported = False
-        # M2 experiments (only for segments that carry position + target_position).
+        # M2 experiments (position or velocity tracking segments only).
         self.experiments_dir = out_dir.parent / "experiments"
         self.tracking = has_tracking_fields(self.reader.fields)
         self.experiment_commands: "queue.Queue[tuple]" = queue.Queue()
         self.experiment: Optional[Experiment] = None
         self.experiments: list[dict] = []
+        if not math.isfinite(self.settings.experiment_max_s) or self.settings.experiment_max_s <= 0:
+            raise ValueError('experiment_max_s must be finite and positive')
+        if not math.isfinite(self.settings.experiment_min_free_gb) or self.settings.experiment_min_free_gb < 0:
+            raise ValueError('experiment_min_free_gb must be finite and nonnegative')
+        self.continuous_paused = False
+        self._continuous_disk_ok = True
+        self._next_disk_check = 0.0
+        self._continuous_resume_seq = 0
+        if self.settings.continuous_experiments and self.tracking:
+            self.experiments_dir.mkdir(parents=True, exist_ok=True)
+            # A logger-only restart must not duplicate the writer's retained two-second ring.
+            for path in self.experiments_dir.glob('*/meta.json'):
+                try:
+                    saved = json.loads(path.read_text())
+                    identity = saved.get('meta') or {}
+                    if (saved.get('source') == 'auto:continuous' and
+                            identity.get('continuous_writer_pid') == self.reader.writer_pid and
+                            identity.get('continuous_writer') == self.reader.writer_name and
+                            identity.get('continuous_created_ns') == self.reader.created_realtime_ns):
+                        self._continuous_resume_seq = max(self._continuous_resume_seq, saved.get('last_seq') or 0)
+                except (OSError, ValueError, TypeError):
+                    continue
 
     # ------------------------------------------------------------------ public (any thread)
     def trigger(self, reason: str, epoch_s: Optional[float] = None, detail: str = "") -> None:
@@ -282,6 +308,11 @@ class BlackBox(threading.Thread):
             "saved": list(self.saved),
             "expected_transitions": list(self.expected[-50:]),
             "experiments": list(self.experiments),
+            "continuous": {"configured": self.settings.continuous_experiments,
+                           "paused": self.continuous_paused, "disk_ok": self._continuous_disk_ok},
+            "active_experiment": None if self.experiment is None else {
+                "name": self.experiment.name, "source": self.experiment.source,
+                "cycles": self.experiment.cycles, "start": self.experiment.start_ts},
         }
 
     # ------------------------------------------------------------------ thread
@@ -307,6 +338,16 @@ class BlackBox(threading.Thread):
             self.last_head, self.last_head_change = batch.head, now
             self.writer_stopped_reported = False
         keep = int(self.settings.history_s * self._rate_hz)
+        if self.settings.continuous_experiments and self.tracking and now >= self._next_disk_check:
+            self._next_disk_check = now + 10.0
+            # Reserve extra space for MCAP finalisation/metadata and other writers between checks.
+            self._continuous_disk_ok = shutil.disk_usage(self.experiments_dir).free >= (
+                self.settings.experiment_min_free_gb * 1024**3 + 256 * 1024**2)
+            if not self._continuous_disk_ok and self.experiment is not None and self.experiment.source == 'auto:continuous':
+                self.experiment.meta['truncated'] = 'disk space guard'
+                stop = SLOT_HEAD.unpack_from(self.history[-1][1], 0)[1] / 1e9 if self.history else self.experiment.start_ts
+                self._finish_experiment(stop)
+                LOG.warning('Continuous recording paused by disk-space guard: %s', self.path.name)
         for seq, slot in batch.slots:
             self.history.append((seq, slot))
             for found in self.scanner.scan(seq, slot):
@@ -315,6 +356,10 @@ class BlackBox(threading.Thread):
                 for event in self.scanner.state_events:
                     self.on_event(event)
                 self.scanner.state_events.clear()
+            if (self.experiment is None and self.settings.continuous_experiments
+                    and self.tracking and not self.continuous_paused and self._continuous_disk_ok
+                    and seq > self._continuous_resume_seq):
+                self._start_continuous(seq, slot)
             if self.experiment is not None:
                 self._experiment_slot(seq, slot)
         self._experiment_requests()
@@ -337,6 +382,18 @@ class BlackBox(threading.Thread):
                 self._dump()
 
     # ------------------------------------------------------------------ experiments
+    def _start_continuous(self, seq: int, slot: bytes) -> None:
+        time_ns = SLOT_HEAD.unpack_from(slot, 0)[1]
+        start = time_ns / 1e9
+        name = f'continuous-{self.reader.writer_name}-{seq}'
+        safe = ''.join(c if c.isascii() and (c.isalnum() or c in '_-') else '_' for c in name)
+        self.experiment = Experiment(self.experiments_dir / f'{time_ns}-{safe}', name, 'auto:continuous',
+                                     self.reader.fields, self.reader.writer_name, start,
+                                     {'continuous_writer_pid': self.reader.writer_pid,
+                                      'continuous_writer': self.reader.writer_name,
+                                      'continuous_created_ns': self.reader.created_realtime_ns,
+                                      'intent': '持续性能记录（自动分段；非运动命令）'}, self.settings.experiment_max_s)
+
     def _experiment_slot(self, seq: int, slot: bytes) -> None:
         experiment = self.experiment
         t = SLOT_HEAD.unpack_from(slot, 0)[1] / 1e9
@@ -358,6 +415,7 @@ class BlackBox(threading.Thread):
             except queue.Empty:
                 break
             if command[0] == "stop":
+                self.continuous_paused = True
                 if self.experiment is not None:
                     self.experiment.stop_ts = command[1]
                 continue
@@ -425,7 +483,8 @@ class BlackBox(threading.Thread):
     EXPERIMENT_STOP_REASONS = ("drive_fault", "left_operation_enabled", "power_lost", "quick_stop", "writer_died", "writer_stalled")
 
     def _add_trigger(self, found: Trigger) -> None:
-        if self.experiment is not None and found.reason in self.EXPERIMENT_STOP_REASONS:
+        if (self.experiment is not None and self.experiment.source != 'auto:continuous'
+                and found.reason in self.EXPERIMENT_STOP_REASONS):
             stop = found.time_ns / 1e9 + 1.0
             if self.experiment.stop_ts is None or stop < self.experiment.stop_ts:
                 self.experiment.stop_ts = stop

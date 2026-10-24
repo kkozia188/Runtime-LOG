@@ -89,6 +89,11 @@ class RunRecorder:
         self.blackbox_settings = blackbox_settings or BlackBoxSettings(
             enums=profile.blackbox.get("enums", {}) or {},
             interface_triggers=list(profile.blackbox.get("interface_triggers", []) or []),
+            experiment_max_s=float(profile.blackbox.get('experiment_max_s', 600.0)),
+            continuous_experiments=(profile.blackbox.get('continuous_experiments') is True and
+                                    launch_args(proc.cmdline(launch_pid)).get(profile.run.get('scope_arg', 'control_scope'), '')
+                                    in (profile.blackbox.get('continuous_scopes') or [])),
+            experiment_min_free_gb=float(profile.blackbox.get('experiment_min_free_gb', 10.0)),
         )
         self.blackboxes: dict[str, BlackBox] = {}
         self.goal_count = 0
