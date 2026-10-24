@@ -4,11 +4,14 @@
   const colors = ['#0969da', '#bc4c00'];
   const groups = [
     ['位置 / °', ['target_position', 'position']], ['跟随误差 / °', ['error']],
-    ['实际速度 / °/s', ['velocity']], ['力矩 / ‰', ['torque_permille']],
-    ['控制周期 / µs', ['period_us']], ['驱动状态字', ['status_word']]
+    ['速度', ['sent_velocity', 'velocity']], ['CSV 速度误差 / rad/s', ['velocity_error']],
+    ['力矩 / ‰', ['torque_permille']], ['反馈年龄 / ms', ['feedback_age_ms']],
+    ['控制周期 / µs', ['period_us']], ['驱动状态字', ['status_word']],
+    ['实际模式（8=CSP，9=CSV）', ['mode_of_operation_display']], ['传感器就绪', ['ready']],
+    ['适配器故障锁存', ['mode_request_error']], ['指令有效', ['command_fresh']]
   ];
   let data = null, charts = [], loading = false, cursor = null;
-  const hidden = new Set(['status_word']);
+  const hidden = new Set(['status_word', 'mode_of_operation_display', 'mode_request_error', 'command_fresh']);
   const fmt = n => Number.isFinite(n) ? Number(n.toPrecision(7)).toString() : '—';
   const message = (text, error = false) => {
     $('message').textContent = text;
@@ -54,9 +57,10 @@
   }
   function build() {
     charts = []; $('charts').replaceChildren(); $('choices').replaceChildren();
-    for (const [title, keys] of groups) {
+    for (const [groupTitle, keys] of groups) {
       const signals = data.series.filter(s => keys.includes(s.key));
       if (!signals.length) continue;
+      const title = groupTitle === '速度' ? `速度 / ${signals[0].unit}` : groupTitle;
       const label = document.createElement('label'), checkbox = document.createElement('input');
       checkbox.type = 'checkbox'; checkbox.checked = !hidden.has(keys[0]);
       label.append(checkbox, ' ' + title); $('choices').append(label);

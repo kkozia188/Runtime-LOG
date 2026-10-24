@@ -85,3 +85,29 @@ def test_waveform_http_and_old_experiment_page(tmp_path, recorded):
     finally:
         server.shutdown()
         server.server_close()
+
+
+def test_blackbox_waveform_route(tmp_path, recorded):
+    root = tmp_path / 'archive'
+    box = root / 'run' / 'blackbox' / 'window-1'
+    box.mkdir(parents=True)
+    recorded.rename(box / 'window.mcap')
+    (root / 'run' / 'run.json').write_text('{}')
+    (box / 'trigger.json').write_text(json.dumps({'fields': ['left_joint1/position'],
+        'window': {'start': 1800000000, 'cycles': 9999, 'missing': 1},
+        'triggers': [{'time_ns': 1800000001234000000, 'reason': 'manual', 'detail': '<unsafe>'}]}))
+    server = serve(Archive(root), '127.0.0.1', 0)
+    base = f'http://127.0.0.1:{server.server_address[1]}/run/blackbox/window-1/'
+    try:
+        with urlopen(base) as response:
+            page = response.read().decode()
+            assert 'wave-load' in page and 'window.csv' in page and 'data.csv' not in page
+            assert '&lt;unsafe&gt;' in page and '1.234000' in page
+        with urlopen(base + 'waveform.json?joint=left_joint1&start=1.23&end=1.24') as response:
+            assert json.load(response)['samples'] == 11
+        with pytest.raises(HTTPError) as error:
+            urlopen(base + 'not-allowed')
+        assert error.value.code == 404
+    finally:
+        server.shutdown()
+        server.server_close()

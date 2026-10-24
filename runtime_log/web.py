@@ -19,13 +19,14 @@ from .compare import render_compare
 from .export import mcap_to_csv
 from .waveform import waveform
 from .experiment_report import render_experiment, render_experiment_compare
+from .waveform_view import render_blackbox
 from .recorder import load_run
 from .report import CSS, RESULT_COLOR, RESULT_LABEL, fmt_s, fmt_time, render
 
 LOG = logging.getLogger("runtime_log.web")
 WAVEFORM_LOCK = threading.BoundedSemaphore(1)
 EXPERIMENT_FILES = {"data.mcap", "data.csv", "meta.json", "plot.json", "waveform.json"}
-BLACKBOX_FILES = {"window.mcap", "window.csv", "trigger.json", "kernel.log", "timeline.json"}
+BLACKBOX_FILES = {"window.mcap", "window.csv", "trigger.json", "kernel.log", "timeline.json", "waveform.json"}
 RUN_FILES = {"report.html", "run.json", "events.jsonl", "resources.jsonl", "ethercat.jsonl", "launch.log.gz"}
 
 
@@ -126,6 +127,24 @@ class Handler(BaseHTTPRequestHandler):
         if not head:
             self.wfile.write(body)
 
+    def _send_waveform(self, source: Path, head: bool) -> None:
+        if not source.is_file():
+            self._send(404, "数据尚未归档或已被清理".encode(), "text/plain; charset=utf-8", head)
+            return
+        if not WAVEFORM_LOCK.acquire(blocking=False):
+            self._send(503, "正在读取其他波形，请稍后重试".encode(), "text/plain; charset=utf-8", head)
+            return
+        try:
+            query = parse_qs(urlparse(self.path).query)
+            end = query.get('end', [None])[0]
+            data = waveform(source, query.get('joint', [''])[0], float(query.get('start', [0])[0]),
+                            float(end) if end is not None else None, int(query.get('width', [1000])[0]))
+            self._send(200, json.dumps(data, allow_nan=False).encode(), 'application/json', head)
+        except ValueError as exc:
+            self._send(400, str(exc).encode(), 'text/plain; charset=utf-8', head)
+        finally:
+            WAVEFORM_LOCK.release()
+
     def _route(self, head: bool) -> None:
         path = unquote(urlparse(self.path).path)
         parts = [part for part in path.split("/") if part]
@@ -197,25 +216,7 @@ class Handler(BaseHTTPRequestHandler):
                 self._send(200, render_experiment(run_id, meta, plot).encode(), "text/html; charset=utf-8", head)
                 return
             if name == "waveform.json":
-                source = exp_dir / "data.mcap"
-                if not source.is_file():
-                    self._send(404, "实验数据尚未归档或已被清理".encode(), "text/plain; charset=utf-8", head)
-                    return
-                if not WAVEFORM_LOCK.acquire(blocking=False):
-                    self._send(503, "正在读取其他波形，请稍后重试".encode(), "text/plain; charset=utf-8", head)
-                    return
-                try:
-                    query = parse_qs(urlparse(self.path).query)
-                    end = query.get("end", [None])[0]
-                    data = waveform(source, query.get("joint", [""])[0],
-                                    float(query.get("start", [0])[0]),
-                                    float(end) if end is not None else None,
-                                    int(query.get("width", [1000])[0]))
-                    self._send(200, json.dumps(data, allow_nan=False).encode(), "application/json", head)
-                except ValueError as exc:
-                    self._send(400, str(exc).encode(), "text/plain; charset=utf-8", head)
-                finally:
-                    WAVEFORM_LOCK.release()
+                self._send_waveform(exp_dir / 'data.mcap', head)
                 return
             if name == "data.csv":
                 self._send_csv(exp_dir / "data.mcap", f"{run_id}-{parts[2]}.csv", head)
@@ -223,7 +224,24 @@ class Handler(BaseHTTPRequestHandler):
             kinds = {"data.mcap": "application/octet-stream", "meta.json": "application/json", "plot.json": "application/json"}
             self._send(200, (exp_dir / name).read_bytes(), kinds[name], head)
             return
-        if len(parts) == 4 and parts[1] == "blackbox" and parts[3] in BLACKBOX_FILES and not parts[2].startswith(".") and "/" not in parts[2]:
+        if len(parts) in (3, 4) and parts[1] == 'blackbox' and not parts[2].startswith('.') and '/' not in parts[2]:
+            box_dir = run_dir / 'blackbox' / parts[2]
+            name = parts[3] if len(parts) == 4 else ''
+            if not (box_dir / 'trigger.json').is_file() or (name and name not in BLACKBOX_FILES):
+                self._send(404, b'not found', 'text/plain', head)
+                return
+            if not name:
+                if not path.endswith('/'):
+                    self.send_response(HTTPStatus.MOVED_PERMANENTLY)
+                    self.send_header('Location', f'/{run_id}/blackbox/{parts[2]}/')
+                    self.end_headers()
+                    return
+                self._send(200, render_blackbox(run_id, parts[2], read_json(box_dir / 'trigger.json', {})).encode(),
+                           'text/html; charset=utf-8', head)
+                return
+            if name == 'waveform.json':
+                self._send_waveform(box_dir / 'window.mcap', head)
+                return
             if parts[3] == "window.csv":
                 self._send_csv(run_dir / "blackbox" / parts[2] / "window.mcap", f"{run_id}-{parts[2]}.csv", head)
                 return

@@ -7,6 +7,8 @@ from pathlib import Path
 
 from mcap.reader import make_reader
 
+from .velocity_experiment import sample_error
+
 RAD = 180.0 / math.pi
 
 
@@ -32,12 +34,22 @@ def waveform(path: Path, joint: str, start: float = 0, end: float | None = None,
         if start > duration:
             raise ValueError("时间范围超出实验长度")
         span = max(end - start, 1e-9)
+        csv_tracking = f'{joint}/sent_velocity' in row
+        speed_scale = 1 if csv_tracking else RAD
+        speed_unit = 'rad/s' if csv_tracking else '°/s'
         specs = [("target_position", "目标位置", "°", RAD), ("position", "实际位置", "°", RAD),
-                 ("error", "跟随误差", "°", RAD), ("velocity", "实际速度", "°/s", RAD),
+                 ("error", "位置跟随误差", "°", RAD), ("velocity", "实际速度", speed_unit, speed_scale),
+                 ("sent_velocity", "已发速度（仅 CSV 有效）", "rad/s", 1),
+                 ("velocity_error", "CSV 速度跟随误差", "rad/s", 1),
                  ("torque_permille", "力矩", "‰", 1), ("period_us", "控制周期", "µs", 1),
-                 ("status_word", "驱动状态字", "原始值", 1)]
+                 ("status_word", "驱动状态字", "原始值", 1),
+                 ("feedback_age_ms", "反馈年龄", "ms", 1), ("ready", "传感器就绪", "0/1", 1),
+                 ("mode_of_operation_display", "实际模式（8=CSP，9=CSV）", "模式", 1),
+                 ("mode_request_error", "适配器故障锁存", "0/1", 1),
+                 ("command_fresh", "指令有效", "0/1", 1)]
         specs = [s for s in specs if s[0] == "period_us" or f"{joint}/{s[0]}" in row or
-                 (s[0] == "error" and f"{joint}/target_position" in row)]
+                 (s[0] == "error" and f"{joint}/target_position" in row) or
+                 (s[0] == "velocity_error" and csv_tracking)]
         series = [{"key": key, "label": label, "unit": unit, "points": []} for key, label, unit, _ in specs]
         # Per bin keep first, last, minimum, maximum in chronological order. O(width) memory.
         buckets = [{} for _ in specs]
@@ -83,6 +95,10 @@ def waveform(path: Path, joint: str, start: float = 0, end: float | None = None,
                     target = values.get(f"{joint}/target_position")
                     position = values.get(f"{joint}/position")
                     value = target - position if isinstance(target, (int, float)) and isinstance(position, (int, float)) else math.nan
+                elif key == 'velocity_error':
+                    value, _ = sample_error(values, joint)
+                elif key == 'sent_velocity':
+                    value = values.get(f'{joint}/{key}') if values.get(f'{joint}/mode_of_operation_display') == 9 else None
                 else:
                     value = values.get(key if key == "period_us" else f"{joint}/{key}", math.nan)
                 value = value * scale if isinstance(value, (float, int)) else math.nan

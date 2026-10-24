@@ -3,6 +3,27 @@ import html
 from pathlib import Path
 
 
+def render_blackbox(run_id: str, name: str, trigger: dict) -> str:
+    from .report import CSS
+
+    esc = html.escape
+    channels = sorted({field.rsplit('/', 1)[0] for field in trigger.get('fields', []) if field.endswith('/position')})
+    window = trigger.get('window') or {}
+    start = window.get('start', 0)
+    rows = ''.join(f'<tr><td>{(t.get("time_ns", 0) / 1e9 - start):.6f}</td>'
+                   f'<td>{esc(t.get("reason", ""))}</td><td>{esc(t.get("detail", ""))}</td></tr>'
+                   for t in trigger.get('triggers', []))
+    viewer = render_waveform(channels).replace('href="data.csv"', 'href="window.csv"') if channels else '<p>此窗口是控制器内部状态记录；请下载 CSV 查看。</p>'
+    return (f'<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">'
+            f'<title>黑匣子 {esc(name)}</title><style>{CSS}</style></head><body><main>'
+            f'<p><a href="../../">← 运行 {esc(run_id)}</a></p><h1>黑匣子 {esc(name)}</h1>'
+            f'<p>采样 {window.get("cycles", 0)} 条 · 缺失 {window.get("missing", 0)} 周期。触发时间相对窗口第一条采样。</p>'
+            '<p><a href="window.csv">CSV</a> · <a href="window.mcap">MCAP</a> · <a href="kernel.log">内核日志</a> · '
+            '<a href="timeline.json">时间线</a> · <a href="trigger.json">触发元数据</a></p>'
+            '<table><tr><th>t / s</th><th>原因</th><th>详情</th></tr>' + rows + '</table>'
+            + viewer + '</main></body></html>')
+
+
 def render_waveform(joints: list[str]) -> str:
     options = "".join(f'<option>{html.escape(joint)}</option>' for joint in joints)
     script = Path(__file__).with_name("waveform_view.js").read_text(encoding="utf-8")
@@ -41,5 +62,6 @@ def render_waveform(joints: list[str]) -> str:
 <div id="wave-choices" class="wave-choices"></div><div id="wave-charts"></div>
 <details><summary>用 PlotJuggler 查看原始采样</summary>
 <p>下载本页 <a href="data.csv">CSV</a>。在 PlotJuggler 的 Data Loader 中打开 CSV，分隔符选逗号，时间列选 <code>time_s</code>（秒）。将左侧信号拖入图中。</p>
-<p><code>left_jointN/target_position</code> 与 <code>left_jointN/position</code> 是目标和实测位置（rad）；<code>velocity</code> 为 rad/s，<code>torque_permille</code> 为额定力矩的千分比，<code>period_us</code> 为控制周期 µs。网页的位置和速度已转换成度。</p>
+<p><code>target_position</code> 与 <code>position</code> 是目标和实测位置（CSV 中为 rad）；<code>velocity</code>、<code>sent_velocity</code> 为 rad/s，<code>torque_permille</code> 为额定力矩的千分比，<code>period_us</code> 为控制周期 µs。网页的位置使用度；含 sent_velocity 的底盘通道使用 rad/s，其他速度使用度/秒。请以各图单位为准。</p>
+<p>底盘 CSV 速度误差仅显示模式9、运行使能、反馈新鲜且适配器有效的采样；失能或切换到模式8时显示断线。转向轴没有实际下发的位置镜像，因此不计算转向跟随误差。编码器以自身采样频率更新，1 kHz 记录可能重复旧值，请结合反馈年龄查看。</p>
 </details></section><script>''' + script + "</script>"

@@ -16,6 +16,8 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Optional
 
+from .velocity_experiment import FEEDBACK_LIMIT_MS, ACTIVE_SPEED_RAD_S, VelocityMetrics, velocity_joints, velocity_summary
+
 SLOT_HEAD = struct.Struct("<Qqq")
 RAD2DEG = 180.0 / math.pi
 
@@ -51,7 +53,7 @@ def joint_fields(fields: list[str]) -> dict[str, dict[str, int]]:
 
 
 def has_tracking_fields(fields: list[str]) -> bool:
-    return bool(joint_fields(fields))
+    return bool(joint_fields(fields) or velocity_joints(fields))
 
 
 class Experiment:
@@ -67,6 +69,9 @@ class Experiment:
         self.meta = dict(meta or {})
         self.joints = joint_fields(fields)
         self.series = {joint: JointSeries() for joint in self.joints}
+        self.velocity_metrics = {joint: VelocityMetrics(joint) for joint in velocity_joints(fields)
+                                 if joint not in self.joints}
+        self.first_time_ns = None
         self.values = struct.Struct(f"<{len(fields)}d")
         self.periods = array("d")
         self.cycles = 0
@@ -94,6 +99,10 @@ class Experiment:
         self.cycles += 1
         message = {"seq": seq, "period_us": period_ns / 1000.0}
         message.update(zip(self.fields, values))
+        if self.first_time_ns is None:
+            self.first_time_ns = time_ns
+        for metric in self.velocity_metrics.values():
+            metric.add(message, (time_ns - self.first_time_ns) / 1e9)
         self._writer.add_message(self._channel, log_time=time_ns, data=json.dumps(message, separators=(",", ":")).encode(),
                                  publish_time=time_ns, sequence=seq & 0xFFFFFFFF)
         t = time_ns / 1e9
@@ -132,6 +141,13 @@ class Experiment:
             "meta": self.meta,
             "written": time.time(),
         }
+        velocity = {joint: metric.result() for joint, metric in self.velocity_metrics.items()}
+        if velocity:
+            document['velocity_joints'] = velocity
+            document['velocity_settings'] = {'feedback_limit_ms': FEEDBACK_LIMIT_MS, 'active_speed_rad_s': ACTIVE_SPEED_RAD_S}
+            if not metrics:
+                document['summary'] = velocity_summary(velocity)
+        document['waveform_channels'] = sorted({name.rsplit('/', 1)[0] for name in self.fields if name.endswith('/position')})
         (self.directory / "meta.json").write_text(json.dumps(document, ensure_ascii=False, indent=1), encoding="utf-8")
         (self.directory / "plot.json").write_text(json.dumps(plot_data(self.series, settings.max_plot_points)), encoding="utf-8")
         return document
