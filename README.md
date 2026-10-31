@@ -192,3 +192,7 @@ uv run --python 3.10 --with pytest --with pyyaml python -m pytest -q tests
 ```
 
 只依赖 Python 3.10 标准库与 PyYAML（工控机系统自带）。项目规则在 `profiles/rt_control.yaml`，全部来自真实 launch.log。
+
+### 左右臂六维力
+
+`/live` 同时展示六通道原始值和协议换算值（N、N·m），并显示采样计数与记录时效。未采集或无效读数显示横线。数据来源、换算规则及验证边界见 [六维力网页说明](docs/force-sensor-display.md)。
