@@ -77,7 +77,7 @@ def render_index(index: dict, station: Optional[dict] = None) -> str:
     free_gb = (usage.get("disk_free_bytes") or 0) / 1024**3
     return f"""<!doctype html><html lang="zh-CN"><head><meta charset="utf-8">{refresh}<meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Runtime-LOG</title><style>{CSS}</style></head><body><main style="max-width:1600px">
-<h1>Runtime-LOG · 运行记录{title} <a href="/live" style="font-size:14px">实时状态 →</a></h1>{peers}
+<h1>Runtime-LOG · 运行记录{title} <a href="/live" style="font-size:14px">实时状态 / 左右臂六维力 →</a></h1>{peers}
 <p class="k">共 {len(runs)} 次运行 · 归档 {archive_mb:.1f} MiB · 磁盘剩余 {free_gb:.1f} GiB · 保留 7 天 · 只读页面 · 更新于 {fmt_time(index.get("generated"))}</p>
 <div class="filters"><label>结果 <select id="fResult"><option value="">全部</option><option value="failed">失败</option><option value="ok">正常结束</option><option value="running">运行中</option><option value="aborted">未正常结束</option><option value="interrupted">记录中断</option></select></label>
 <label>硬件 <select id="fHw"><option value="">全部</option><option>ethercat</option><option>mock</option></select></label>
