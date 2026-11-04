@@ -266,7 +266,7 @@ def test_recorder_attaches_the_control_process_segment_and_reports_blackbox_even
 
 def test_console_audit_lines_of_this_domain_join_the_timeline(tmp_path, profile, artifact_dir, monkeypatch):
     home = tmp_path / "home"
-    audit = home / ".ros/log/rt_control_arm_console/audit.jsonl"
+    audit = home / ".ros/log/integ_operator_web/audit.jsonl"
     audit.parent.mkdir(parents=True)
     log_dir = tmp_path / f"x-{LAUNCH_PID}"
     log_dir.mkdir()

@@ -197,26 +197,26 @@ def test_profile_interface_triggers_on_chassis_fields(tmp_path, profile):
     box, events = make_box(tmp_path, writer.path, interface_triggers=profile.blackbox["interface_triggers"])
     chassis_cycles(writer, 1500)
     box._step(final=False)
-    chassis_cycles(writer, 1, error=1.0, wheel_age=35.0, encoder_age=25.0, ready=0.0)
-    chassis_cycles(writer, 600, error=1.0, wheel_age=35.0, encoder_age=25.0, ready=0.0)
+    chassis_cycles(writer, 1, error=1.0, wheel_age=65.0, encoder_age=55.0, ready=0.0)
+    chassis_cycles(writer, 600, error=1.0, wheel_age=65.0, encoder_age=55.0, ready=0.0)
     box._step(final=True)
     assert events[-1]["kind"] == "blackbox_saved"
     assert set(events[-1]["reasons"]) == {"drive_adapter_error", "feedback_stale", "sensor_not_ready"}
     document = json.loads((tmp_path / "bb" / box.saved[0] / "trigger.json").read_text())
     details = sorted(t["detail"] for t in document["triggers"] if t["reason"] == "feedback_stale")
-    assert details == ["steering_encoder_1/feedback_age_ms 4 -> 25", "wheel1_joint/feedback_age_ms 1 -> 35"]
+    assert details == ["steering_encoder_1/feedback_age_ms 4 -> 55", "wheel1_joint/feedback_age_ms 1 -> 65"]
 
 
 def test_interface_triggers_are_edges_and_shutdown_explains_them(tmp_path, profile):
     writer = PyWriter(tmp_path / "seg", CHASSIS)
     box, events = make_box(tmp_path, writer.path, explain=lambda a, b: "shutdown",
                            interface_triggers=profile.blackbox["interface_triggers"])
-    chassis_cycles(writer, 1500, encoder_age=30.0)  # already stale at the first cycle: no edge
+    chassis_cycles(writer, 1500, encoder_age=60.0)  # already stale at the first cycle: no edge
     box._step(final=False)
     assert box.pending is None
     chassis_cycles(writer, 1, encoder_age=4.0)
-    chassis_cycles(writer, 1, encoder_age=30.0)  # crosses again during a stop
-    chassis_cycles(writer, 600, encoder_age=30.0)
+    chassis_cycles(writer, 1, encoder_age=60.0)  # crosses again during a stop
+    chassis_cycles(writer, 600, encoder_age=60.0)
     box._step(final=True)
     assert not box.saved and events[-1]["kind"] == "blackbox_expected" and events[-1]["reasons"] == ["feedback_stale"]
 

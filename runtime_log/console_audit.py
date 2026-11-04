@@ -1,4 +1,8 @@
-"""Operator console audit log (rt_control_arm_console --audit-log, JSON lines) -> timeline events."""
+"""Operator audit log (integ_operator_web --audit-log, JSON lines) -> timeline events.
+
+The arm page keeps the former rt_control_arm_console action names; head page actions carry a
+``head_`` prefix.
+"""
 
 from __future__ import annotations
 
@@ -20,13 +24,21 @@ LABELS = {
     "run_sequence": "运行位姿序列",
     "save_pose": "保存位姿",
     "delete_pose": "删除位姿",
+    "reset_fault": "故障复位",
+    "halt": "操作台急停",
+    "head_acquire": "取得头部控制权",
+    "head_release": "释放头部控制权",
+    "head_move": "头部目标",
+    "head_hold": "头部原地停止",
+    "head_reset_fault": "头部故障复位",
 }
 
 
 def label(entry: dict) -> str:
     action = entry.get("action", "")
-    if action == "enable":
-        return "操作台使能" if entry.get("args", {}).get("enabled") else "操作台失能"
+    if action in ("enable", "head_enable"):
+        prefix = "头部" if action == "head_enable" else "操作台"
+        return prefix + ("使能" if entry.get("args", {}).get("enabled") else "失能")
     return LABELS.get(action, action)
 
 

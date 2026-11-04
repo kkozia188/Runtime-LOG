@@ -601,7 +601,7 @@ class RunRecorder:
             self.document["send_trace"] = read_send_trace(Path(self.document["send_trace_path"]))
         post_stop = self.profile.ethercat.get("post_stop") or {}
         if not interrupted and self.uses_ethercat and not self.mock and self.poller is not None and post_stop.get("enabled"):
-            result = read_post_stop(self.poller, post_stop)
+            result = read_post_stop(self.poller, post_stop, self.artifact.get("dir"))
             self.document["post_stop"] = result
             for row in result.get("drives", []):
                 if row.get("error_code") or row.get("fault"):
