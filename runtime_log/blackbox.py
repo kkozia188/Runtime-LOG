@@ -14,6 +14,7 @@ import math
 import queue
 import shutil
 import struct
+import tempfile
 import threading
 import time
 from dataclasses import dataclass, field
@@ -21,6 +22,7 @@ from pathlib import Path
 from typing import Callable, Optional
 
 from . import cia402
+from .archive import write_json
 from .experiment import Experiment, has_tracking_fields
 from .shm import ShmReader
 
@@ -246,6 +248,7 @@ class BlackBox(threading.Thread):
         self.stop_requested = threading.Event()
         self.gaps = 0
         self.saved: list[str] = []
+        self.archive_errors: collections.deque = collections.deque(maxlen=50)
         self.expected: list[dict] = []
         self.last_head = 0
         self.last_head_change = time.monotonic()
@@ -306,6 +309,7 @@ class BlackBox(threading.Thread):
             "cycle_stats": self.scanner.summary(),
             "drive_states": self.scanner.drive_states(),
             "saved": list(self.saved),
+            "archive_errors": list(self.archive_errors),
             "expected_transitions": list(self.expected[-50:]),
             "experiments": list(self.experiments),
             "continuous": {"configured": self.settings.continuous_experiments,
@@ -379,7 +383,27 @@ class BlackBox(threading.Thread):
         if self.pending is not None:
             writer_done = final or not writer_alive or self.reader.writer_state != "active" or stalled
             if self.history and (self.history[-1][0] >= self.pending.until_seq or writer_done):
-                self._dump()
+                pending = self.pending
+                try:
+                    self._dump()
+                except Exception as error:  # A failed window must not terminate this reader.
+                    self.pending = None  # Do not retry a failed window on every polling cycle.
+                    record = {"kind": "blackbox_error", "ts": pending.first_trigger.time_ns / 1e9,
+                              "segment": self.path.name,
+                              "reasons": sorted({t.reason for t in pending.triggers}),
+                              "detail": f"{type(error).__name__}: {error}"}
+                    self.archive_errors.append(record)
+                    LOG.exception("black box archive failed for %s; sampling continues", self.path.name)
+                    self.on_event(record)
+
+    def _archive_directory(self, parent: Path, prefix: str, suffix: str = "") -> Path:
+        """Reserve a unique directory, including across concurrent readers/processes."""
+        segment = "".join(c if c.isascii() and (c.isalnum() or c in "_-") else "_"
+                          for c in self.path.name)[:80]
+        parent.mkdir(parents=True, exist_ok=True)
+        # Keep manual goal-N as the final suffix: restart goal numbering depends on it.
+        return Path(tempfile.mkdtemp(prefix=f"{prefix}-{segment}-",
+                                     suffix=f"-{suffix}" if suffix else "", dir=parent))
 
     # ------------------------------------------------------------------ experiments
     def _start_continuous(self, seq: int, slot: bytes) -> None:
@@ -387,7 +411,7 @@ class BlackBox(threading.Thread):
         start = time_ns / 1e9
         name = f'continuous-{self.reader.writer_name}-{seq}'
         safe = ''.join(c if c.isascii() and (c.isalnum() or c in '_-') else '_' for c in name)
-        self.experiment = Experiment(self.experiments_dir / f'{time_ns}-{safe}', name, 'auto:continuous',
+        self.experiment = Experiment(self._archive_directory(self.experiments_dir, f'{time_ns}-{safe}'), name, 'auto:continuous',
                                      self.reader.fields, self.reader.writer_name, start,
                                      {'continuous_writer_pid': self.reader.writer_pid,
                                       'continuous_writer': self.reader.writer_name,
@@ -426,7 +450,7 @@ class BlackBox(threading.Thread):
                 self._finish_experiment(start_ts)
             stamp = time.strftime("%Y%m%d-%H%M%S", time.localtime(start_ts)) + f".{int((start_ts % 1) * 1000):03d}"
             safe = "".join(c if c.isascii() and (c.isalnum() or c in "_-") else "_" for c in name)[:60]
-            self.experiment = Experiment(self.experiments_dir / f"{stamp}-{safe}", name, source, self.reader.fields,
+            self.experiment = Experiment(self._archive_directory(self.experiments_dir, stamp, safe), name, source, self.reader.fields,
                                          self.reader.writer_name, start_ts, meta, self.settings.experiment_max_s)
             backfill = True
         if self.experiment is None:
@@ -519,8 +543,7 @@ class BlackBox(threading.Thread):
             self.on_event({"kind": "blackbox_expected", "ts": t_first, "reasons": reasons, "explained_by": explanation})
             return
         stamp = time.strftime("%Y%m%d-%H%M%S", time.localtime(t_first)) + f".{int((t_first % 1) * 1000):03d}"
-        target = self.out_dir / f"{stamp}-{first.reason}"
-        target.mkdir(parents=True, exist_ok=True)
+        target = self._archive_directory(self.out_dir, stamp, first.reason)
         t_start = SLOT_HEAD.unpack_from(window[0][1], 0)[1] / 1e9
         t_end = SLOT_HEAD.unpack_from(window[-1][1], 0)[1] / 1e9
         write_mcap(target / "window.mcap", self.reader, window)
@@ -535,7 +558,8 @@ class BlackBox(threading.Thread):
                        "cycles": len(window), "missing": window[-1][0] - window[0][0] + 1 - len(window)},
             "fields": self.reader.fields,
         }
-        (target / "trigger.json").write_text(json.dumps(document, ensure_ascii=False, indent=1), encoding="utf-8")
+        # Publish the completion marker atomically, only after MCAP and logs are written.
+        write_json(target / "trigger.json", document)
         self.saved.append(target.name)
         self.on_event({"kind": "blackbox_saved", "ts": t_first, "reasons": reasons, "dir": target.name,
                        "detail": "; ".join(f"{t.reason}: {t.detail}" for t in pending.triggers[:5])})

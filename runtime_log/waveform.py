@@ -13,7 +13,9 @@ RAD = 180.0 / math.pi
 
 
 def waveform(path: Path, joint: str, start: float = 0, end: float | None = None,
-             width: int = 1000) -> dict:
+             width: int = 1000, time_origin: float | None = None) -> dict:
+    if time_origin is not None and (not math.isfinite(time_origin) or time_origin < 0):
+        raise ValueError("时间基准无效")
     if not math.isfinite(start) or start < 0 or (end is not None and (not math.isfinite(end) or end <= start)):
         raise ValueError("时间范围无效")
     width = max(100, min(2000, width))
@@ -22,7 +24,8 @@ def waveform(path: Path, joint: str, start: float = 0, end: float | None = None,
         first = next(reader.iter_messages(), None)
         if first is None:
             return {"series": [], "samples": 0, "duration": 0, "start": 0, "end": 0}
-        origin = first[2].log_time
+        first_ns = first[2].log_time
+        origin = first_ns if time_origin is None else round(time_origin * 1e9)
         row = json.loads(first[2].data)
         if f"{joint}/position" not in row:
             raise ValueError("归档中没有这个关节")
@@ -30,9 +33,16 @@ def waveform(path: Path, joint: str, start: float = 0, end: float | None = None,
         if not summary or not summary.statistics:
             raise ValueError("归档缺少索引，请下载 CSV 查看")
         duration = max(0, (summary.statistics.message_end_time - origin) / 1e9)
+        available_start = (first_ns - origin) / 1e9
+        requested_end = end
         end = min(duration, end) if end is not None else duration
+        if time_origin is not None and (start > duration or end < available_start):
+            return {"series": [], "samples": 0, "missing": 0, "duration": duration,
+                    "start": start, "end": requested_end if requested_end is not None else max(start, duration),
+                    "available_start": available_start, "origin_s": origin / 1e9, "aggregated": False}
         if start > duration:
             raise ValueError("时间范围超出实验长度")
+        start = max(start, available_start)
         span = max(end - start, 1e-9)
         csv_tracking = f'{joint}/sent_velocity' in row
         speed_scale = 1 if csv_tracking else RAD
@@ -53,6 +63,7 @@ def waveform(path: Path, joint: str, start: float = 0, end: float | None = None,
         series = [{"key": key, "label": label, "unit": unit, "points": []} for key, label, unit, _ in specs]
         # Per bin keep first, last, minimum, maximum in chronological order. O(width) memory.
         buckets = [{} for _ in specs]
+        valid_counts = [0 for _ in specs]
         counts = 0
         missing = 0
         last_seq = None
@@ -89,7 +100,7 @@ def waveform(path: Path, joint: str, start: float = 0, end: float | None = None,
             counts += 1
             if counts % 1000 == 0:
                 check_budget()
-            for spec, bucket, output in zip(specs, buckets, series):
+            for series_index, (spec, bucket, output) in enumerate(zip(specs, buckets, series)):
                 key, _, _, scale = spec
                 if key == "error":
                     target = values.get(f"{joint}/target_position")
@@ -111,6 +122,7 @@ def waveform(path: Path, joint: str, start: float = 0, end: float | None = None,
                     if not output["points"] or output["points"][-1][1] is not None:
                         output["points"].append([t, None])
                     continue
+                valid_counts[series_index] += 1
                 point = [t, value]
                 if not bucket:
                     bucket.update(first=point, last=point, low=point, high=point)
@@ -122,5 +134,7 @@ def waveform(path: Path, joint: str, start: float = 0, end: float | None = None,
                         bucket["high"] = point
         flush()
         return {"joint": joint, "duration": duration, "start": start, "end": end,
+                "available_start": available_start, "origin_s": origin / 1e9,
                 "samples": counts, "missing": missing, "series": series,
-                "aggregated": any(len(s["points"]) < counts for s in series)}
+                "aggregated": any(sum(p[1] is not None for p in s['points']) < count
+                                  for s, count in zip(series, valid_counts))}

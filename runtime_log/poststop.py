@@ -6,14 +6,31 @@ still on the bus. One attempt per object, no retries; failures are recorded with
 
 from __future__ import annotations
 
+from pathlib import Path
 import re
 import time
 from typing import Optional
 
+import yaml
+
 from .ethercat import EthercatPoller
 
 
-def read_post_stop(poller: EthercatPoller, settings: dict) -> dict:
+def artifact_fault_names(generated_dir) -> dict:
+    """Vendor code -> text from the artifact's diagnostics.yaml fault tables (robot_driver owns them)."""
+    path = Path(generated_dir) / "diagnostics.yaml" if generated_dir else None
+    if path is None or not path.is_file():
+        return {}
+    tables = (yaml.safe_load(path.read_text(encoding="utf-8")) or {}).get("fault_tables", {})
+    return {
+        int(fault["code"], 16): f"{fault['message']}（{table['vendor']} 手册 p{fault['page']}）"
+        for table in tables.values()
+        for fault in table.get("faults", [])
+        if "code" in fault
+    }
+
+
+def read_post_stop(poller: EthercatPoller, settings: dict, generated_dir=None) -> dict:
     result: dict = {"time": time.time(), "drives": [], "skipped": None}
     try:
         master = poller.master_state()
@@ -30,7 +47,7 @@ def read_post_stop(poller: EthercatPoller, settings: dict) -> dict:
         result["skipped"] = f"ethercat slaves failed: {error}"[:200]
         return result
     pattern = re.compile(settings.get("drive_name_regex", "Driver|Drive|Servo"))
-    names = settings.get("error_codes", {}) or {}
+    names = {**(settings.get("error_codes", {}) or {}), **artifact_fault_names(generated_dir)}
     for slave in slaves:
         if not pattern.search(slave["name"]):
             continue

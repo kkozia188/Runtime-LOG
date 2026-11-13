@@ -6,6 +6,8 @@
 // interfaces) into the ring and commits. Measures the copy+commit time and the wake-up latency.
 // --period-us 0 writes as fast as possible (stress test); --pattern writes value = seq * 1000 + i.
 
+// --stream synchronizes startup with the reader and runs without collecting benchmark metrics.
+
 #include <pthread.h>
 #include <sched.h>
 #include <sys/mman.h>
@@ -31,6 +33,7 @@ struct Options
   int cpu = -1;
   int prio = 0;
   bool pattern = false;
+  bool stream = false;
 };
 
 Options parse(int argc, char ** argv)
@@ -47,6 +50,7 @@ Options parse(int argc, char ** argv)
     else if (a == "--cpu") o.cpu = std::stoi(next());
     else if (a == "--prio") o.prio = std::stoi(next());
     else if (a == "--pattern") o.pattern = true;
+    else if (a == "--stream") o.stream = true;
     else { std::fprintf(stderr, "unknown argument %s\n", a.c_str()); std::exit(2); }
   }
   return o;
@@ -93,18 +97,24 @@ int main(int argc, char ** argv)
   std::vector<const double *> pointers;
   for (auto & value : source) pointers.push_back(&value);
   std::vector<int64_t> write_ns, wake_ns;
-  write_ns.reserve(o.cycles);
-  wake_ns.reserve(o.cycles);
+  if (!o.stream) {
+    write_ns.reserve(o.cycles);
+    wake_ns.reserve(o.cycles);
+  } else {
+    std::puts("ready");
+    std::fflush(stdout);
+    if (std::getchar() == EOF) return 1;
+  }
 
   timespec next{};
   clock_gettime(CLOCK_MONOTONIC, &next);
-  for (long n = 1; n <= o.cycles; ++n) {
+  for (long n = 1; o.stream || n <= o.cycles; ++n) {
     if (o.period_us > 0) {
       next.tv_nsec += o.period_us * 1000;
       while (next.tv_nsec >= 1000000000L) { next.tv_nsec -= 1000000000L; ++next.tv_sec; }
       clock_nanosleep(CLOCK_MONOTONIC, TIMER_ABSTIME, &next, nullptr);
       const int64_t woke = runtime_log::clock_ns(CLOCK_MONOTONIC);
-      wake_ns.push_back(woke - (static_cast<int64_t>(next.tv_sec) * 1000000000LL + next.tv_nsec));
+      if (!o.stream) wake_ns.push_back(woke - (static_cast<int64_t>(next.tv_sec) * 1000000000LL + next.tv_nsec));
     }
     for (int i = 0; i < o.fields; ++i) source[i] = o.pattern ? static_cast<double>(n) * 1000.0 + i : source[i] + 1.0;
     const int64_t t0 = runtime_log::clock_ns(CLOCK_MONOTONIC);
@@ -112,7 +122,7 @@ int main(int argc, char ** argv)
     for (int i = 0; i < o.fields; ++i) values[i] = *pointers[i];
     writer.commit(t0, o.period_us * 1000);
     const int64_t t1 = runtime_log::clock_ns(CLOCK_MONOTONIC);
-    write_ns.push_back(t1 - t0);
+    if (!o.stream) write_ns.push_back(t1 - t0);
   }
   writer.set_state(runtime_log::WriterState::kInactive);
   std::printf("fields=%d slots=%d slot_bytes=%zu locked=%d cycles=%ld period_us=%ld cpu=%d prio=%d\n", o.fields, o.slots,

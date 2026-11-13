@@ -117,7 +117,9 @@ class ShmReader:
             start = oldest
         stop = head if max_cycles is None else min(head, start + max_cycles - 1)
         slots = []
-        for seq in range(start, stop + 1):
+        # Copy recent slots first before a fast writer wraps over the snapshot.
+        # The consumer still receives ascending sequence order, with unchanged gap accounting.
+        for seq in range(stop, start - 1, -1):
             offset = self.header_size + (seq % self.slot_count) * self.slot_size
             first = U64.unpack_from(self.map, offset)[0]
             if first != seq:
@@ -128,6 +130,7 @@ class ShmReader:
                 gaps += 1  # rewritten while copying
                 continue
             slots.append((seq, raw))
+        slots.reverse()
         self.next = stop + 1
         return RawBatch(slots, gaps, head)
 

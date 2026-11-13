@@ -109,6 +109,9 @@ class RunRecorder:
         self.proc = proc
         self.poller = poller
         self.clock = clock
+        # Restart replay rebuilds events, but must never save today's samples for old errors.
+        self.capture_started = self.clock()
+        self.last_controller_error_capture = float('-inf')
         settings = profile.ethercat
         self.ecat_startup_hz, self.ecat_steady_hz = ethercat_hz or (
             float(settings.get("startup_poll_hz", 5)),
@@ -296,6 +299,31 @@ class RunRecorder:
                     self._attach_control_node(event.data["pid"])
                 if event.rule in self.profile.ready_stages:
                     self.ready_ts = event.ts
+            self._capture_controller_error(line)
+
+    def _capture_controller_error(self, line) -> None:
+        """Fresh controller ERROR/FATAL -> existing ring window; no ROS subscriptions or commands."""
+        if self.profile.blackbox.get('capture_controller_errors') is not True or line.level != 'error':
+            return
+        if line.ts < self.capture_started or not 0 <= self.clock() - line.ts <= 20.0:
+            return
+        controllers = set((self.artifact or {}).get('controllers') or {})
+        logger = line.logger.rsplit('/', 1)[-1].rsplit('.', 1)[-1]
+        if logger not in controllers and logger != 'controller_manager':
+            return
+        # Errors within the already pending post-trigger interval share the window.
+        # Keep all original log events, but bound trigger traffic during an error burst.
+        if line.ts - self.last_controller_error_capture < 2.0:
+            return
+        boxes = self._active_boxes()
+        if not boxes and self.control_pid is not None:
+            self.attach_segments()
+            boxes = self._active_boxes()
+        if not boxes:
+            return
+        for box in boxes:
+            box.trigger('controller_error', line.ts, line.text[:500])
+        self.last_controller_error_capture = line.ts
 
     def _attach_control_node(self, pid: int) -> None:
         self.control_pid = pid
@@ -394,6 +422,10 @@ class RunRecorder:
                 self._emit(Event(item["ts"], "state", "controller", item["field"], f"{item['title']}：{item['old_label']} → {item['new_label']}",
                                  "info", rule=f"state_{item['field']}", label=f"{item['title']}：{item['new_label']}",
                                  data={"old": item["old"], "new": item["new"]}))
+            elif item["kind"] == "blackbox_error":
+                self._emit(Event(item["ts"], "blackbox", "runtime-log", item["segment"], item["detail"], "error",
+                                 rule="blackbox_error", label="黑匣子归档失败（继续采样）",
+                                 data={"segment": item["segment"], "reasons": item["reasons"]}))
             elif item["kind"] == "blackbox_saved":
                 self._write_window_context(item)
                 self._emit(Event(item["ts"], "blackbox", "runtime-log", item["dir"], item.get("detail", ""), "error",
@@ -601,7 +633,7 @@ class RunRecorder:
             self.document["send_trace"] = read_send_trace(Path(self.document["send_trace_path"]))
         post_stop = self.profile.ethercat.get("post_stop") or {}
         if not interrupted and self.uses_ethercat and not self.mock and self.poller is not None and post_stop.get("enabled"):
-            result = read_post_stop(self.poller, post_stop)
+            result = read_post_stop(self.poller, post_stop, self.artifact.get("dir"))
             self.document["post_stop"] = result
             for row in result.get("drives", []):
                 if row.get("error_code") or row.get("fault"):

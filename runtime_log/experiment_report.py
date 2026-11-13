@@ -9,6 +9,7 @@ from typing import Optional
 
 from .report import CSS, fmt_s, fmt_time, line_chart
 from .waveform_view import render_waveform
+from .ui import frame_page
 
 METRICS = [
     ("travel_deg", "行程 °"),
@@ -172,9 +173,9 @@ def render_experiment(run_id: str, meta: dict, plot: dict) -> str:
     metric_section += velocity_section(meta)
     explanation = (f'到位：终点误差小于 {settings.get("settle_tolerance_deg")}° 并保持 {settings.get("settle_hold_s")} s；'
                    '位置跟随误差 = 实际发给驱动的目标位置 − 实际位置。') if joints else '底盘实验：行走轮速度、转向位置、外置编码器与总线状态。'
-    return (
+    return frame_page(
         f'<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>{esc(meta.get("name"))} · 实验</title><style>{CSS}</style></head><body><main>'
-        f'<p><a href="../../">← 运行 {esc(run_id)}</a></p><h1>实验 {esc(meta.get("name"))}</h1>'
+        f'<div class="breadcrumb"><a href="../../">返回运行 {esc(run_id)}</a><span>/</span>数据与性能</div><h1>{esc(meta.get("name"))}</h1>'
         f'<div class="card grid"><div><div class="k">开始</div><div class="v">{fmt_time(meta.get("start"))}</div></div>'
         f'<div><div class="k">时长</div><div class="v">{fmt_s(meta.get("duration_s"))}</div></div>'
         f'<div><div class="k">来源</div><div class="v">{esc(meta.get("source"))}</div></div>'
@@ -215,7 +216,7 @@ def render_experiment_compare(a: tuple[str, dict], b: tuple[str, dict]) -> str:
             rows.append(f'<tr><td>{esc(joint)}</td><td>{esc(label)}</td>'
                         f'<td class="num">{_value(a_value) if a_value is not None else "—"}</td>'
                         f'<td class="num">{_value(b_value) if b_value is not None else "—"}</td><td class="num">{delta}</td></tr>')
-    return (
+    return frame_page(
         f'<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><title>实验对比</title><style>{CSS}</style></head><body><main>'
         f'<p><a href="/">← 全部运行</a></p><h1>实验对比</h1><p>A：{esc(name_a)}（{fmt_time(meta_a.get("start"))}，{esc((meta_a.get("meta") or {}).get("intent", ""))}）<br>'
         f'B：{esc(name_b)}（{fmt_time(meta_b.get("start"))}，{esc((meta_b.get("meta") or {}).get("intent", ""))}）</p>'

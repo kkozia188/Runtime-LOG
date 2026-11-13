@@ -8,6 +8,7 @@ from mcap.writer import Writer
 
 from runtime_log.archive import Archive
 from runtime_log.waveform import waveform
+from runtime_log.waveform_view import render_blackbox, render_waveform
 from runtime_log.web import serve
 
 
@@ -31,6 +32,35 @@ def recorded(tmp_path):
                                data=json.dumps(row).encode())
         writer.finish()
     return path
+
+
+def test_default_waveform_is_bounded_and_blackbox_focuses_first_trigger():
+    from html.parser import HTMLParser
+
+    class Inputs(HTMLParser):
+        def __init__(self, page):
+            super().__init__()
+            self.values = {}
+            self.feed(page)
+
+        def handle_starttag(self, tag, attrs):
+            attrs = dict(attrs)
+            if tag == 'input':
+                self.values[attrs.get('id')] = attrs.get('value')
+
+    plain = Inputs(render_waveform(['wheel']))
+    assert float(plain.values['wave-start']) == 0
+    assert float(plain.values['wave-end']) == 12
+    # Merged triggers can create a long blackbox; do not open that whole window.
+    page = render_blackbox('run', 'merged', {
+        'fields': ['wheel/position'], 'window': {'start': 1800000000, 'end': 1800000060},
+        'triggers': [{'time_ns': 1800000030000000000, 'reason': 'manual'}]})
+    focused = Inputs(page)
+    assert float(focused.values['wave-start']) == 20
+    assert float(focused.values['wave-end']) == 32
+    clipped = Inputs(render_waveform(['wheel'], focus_s=3))
+    assert float(clipped.values['wave-start']) == 0
+    assert float(clipped.values['wave-end']) == 5
 
 
 def test_overview_preserves_peak_units_and_gaps(recorded):
@@ -60,6 +90,14 @@ def test_zoom_reads_original_samples_and_includes_endpoint(recorded):
 def test_reject_invalid_queries(recorded, kwargs):
     with pytest.raises(ValueError):
         waveform(recorded, **({'joint': 'left_joint1'} | kwargs))
+
+
+def test_raw_query_with_invalid_samples_is_not_called_an_aggregate(recorded):
+    data = waveform(recorded, 'left_joint1', start=3.999, end=4.002)
+    assert data['samples'] == 4
+    assert not data['aggregated']
+    position = next(s for s in data['series'] if s['key'] == 'position')
+    assert any(p[1] is None for p in position['points'])
 
 
 def test_waveform_http_and_old_experiment_page(tmp_path, recorded):

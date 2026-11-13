@@ -21,7 +21,7 @@ from .waveform import waveform
 from .experiment_report import render_experiment, render_experiment_compare
 from .waveform_view import render_blackbox
 from .recorder import load_run
-from .report import CSS, RESULT_COLOR, RESULT_LABEL, fmt_s, fmt_time, render
+from .report import render
 
 LOG = logging.getLogger("runtime_log.web")
 WAVEFORM_LOCK = threading.BoundedSemaphore(1)
@@ -44,55 +44,8 @@ def station_header(station: Optional[dict]) -> tuple[str, str]:
 
 
 def render_index(index: dict, station: Optional[dict] = None) -> str:
-    title, peers = station_header(station)
-    runs = index.get("runs", [])
-    usage = index.get("usage", {})
-    rows = []
-    for run in runs:
-        result = run.get("result") or "?"
-        color = RESULT_COLOR.get(result, "#57606a")
-        anomalies = {k: v for k, v in (run.get("anomalies") or {}).items() if k.startswith(("ecat.", "process.died", "log.failures", "log.error"))}
-        top = ", ".join(f"{k.split('.', 1)[1]}×{v}" for k, v in sorted(anomalies.items(), key=lambda kv: -kv[1])[:3])
-        detail = run.get("failure_label") or ""
-        if run.get("failed_stage"):
-            detail = f'<b>{esc(run["failed_stage"])}</b>：{esc(detail)}'
-        else:
-            detail = esc(detail)
-        rows.append(
-            f'<tr data-result="{esc(result)}" data-hw="{esc(run.get("hardware"))}">'
-            f'<td><input type="checkbox" class="pick" value="{esc(run["id"])}"></td>'
-            f'<td class="mono">{esc(fmt_time(run.get("start")))}</td>'
-            f'<td><a href="{esc(run["id"])}/">{esc(run["id"])}</a></td>'
-            f'<td>{esc(run.get("scope"))}</td><td class="num">{esc(run.get("domain"))}</td><td>{esc(run.get("hardware"))}</td>'
-            f'<td><span class="badge" style="background:{color}">{esc(RESULT_LABEL.get(result, result))}</span></td>'
-            f'<td class="num">{fmt_s(run.get("duration_s"))}</td><td class="num">{fmt_s(run.get("ready_s"))}</td>'
-            f'<td>{detail}</td><td>{esc(run.get("last_stage"))}</td>'
-            f'<td class="num">{sum(anomalies.values()) or ""}</td><td class="mono">{esc(top)}</td>'
-            f'<td class="num">{esc(run.get("peak_cpu") if run.get("peak_cpu") is not None else "")}</td>'
-            f'<td class="num">{run.get("blackbox_saved") or ""}</td><td class="num">{run.get("experiments") or ""}</td><td>{esc(run.get("source"))}</td></tr>'
-        )
-    running = any(run.get("result") == "running" for run in runs)
-    refresh = '<meta http-equiv="refresh" content="10">' if running else ""
-    archive_mb = (usage.get("archive_bytes") or 0) / 1024**2
-    free_gb = (usage.get("disk_free_bytes") or 0) / 1024**3
-    return f"""<!doctype html><html lang="zh-CN"><head><meta charset="utf-8">{refresh}<meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Runtime-LOG</title><style>{CSS}</style></head><body><main style="max-width:1600px">
-<h1>Runtime-LOG · 运行记录{title} <a href="/live" style="font-size:14px">实时状态 →</a></h1>{peers}
-<p class="k">共 {len(runs)} 次运行 · 归档 {archive_mb:.1f} MiB · 磁盘剩余 {free_gb:.1f} GiB · 保留 7 天 · 只读页面 · 更新于 {fmt_time(index.get("generated"))}</p>
-<div class="filters"><label>结果 <select id="fResult"><option value="">全部</option><option value="failed">失败</option><option value="ok">正常结束</option><option value="running">运行中</option><option value="aborted">未正常结束</option><option value="interrupted">记录中断</option></select></label>
-<label>硬件 <select id="fHw"><option value="">全部</option><option>ethercat</option><option>mock</option></select></label>
-<label><input id="fAnomaly" type="checkbox"> 只看有异常</label><label>搜索 <input id="fText" size="24"></label></div>
-<p><button id="compareBtn" disabled>对比所选两次运行</button> <span class="k">勾选两行后对比（先选的为 A）</span></p>
-<table id="runs"><tr><th></th><th>开始</th><th>运行</th><th>scope</th><th>域</th><th>硬件</th><th>结果</th><th>时长</th><th>就绪</th><th>失败步骤</th><th>最后成功步骤</th><th>异常</th><th>主要异常</th><th>峰值 CPU%</th><th>黑匣子</th><th>实验</th><th>来源</th></tr>
-{"".join(rows) or '<tr><td colspan="17">还没有运行记录</td></tr>'}</table></main>
-<script>
-const rows=[...document.querySelectorAll('#runs tr[data-result]')];
-function apply(){{const r=fResult.value,h=fHw.value,a=fAnomaly.checked,t=fText.value.toLowerCase();
-rows.forEach(x=>{{const ok=(!r||x.dataset.result===r)&&(!h||x.dataset.hw===h)&&(!a||x.cells[11].textContent.trim())&&(!t||x.textContent.toLowerCase().includes(t));x.style.display=ok?'':'none'}})}}
-[fResult,fHw,fAnomaly,fText].forEach(e=>e.oninput=e.onchange=apply);
-const picked=[];document.querySelectorAll('.pick').forEach(c=>c.onchange=()=>{{const i=picked.indexOf(c.value);if(c.checked){{picked.push(c.value);while(picked.length>2){{const old=picked.shift();document.querySelector('.pick[value="'+old+'"]').checked=false}}}}else if(i>=0)picked.splice(i,1);compareBtn.disabled=picked.length!==2}});
-compareBtn.onclick=()=>{{location.href='/compare?a='+encodeURIComponent(picked[0])+'&b='+encodeURIComponent(picked[1])}};
-</script></body></html>"""
+    from .index_view import render_home
+    return render_home(index, station)
 
 
 class Handler(BaseHTTPRequestHandler):
@@ -137,8 +90,10 @@ class Handler(BaseHTTPRequestHandler):
         try:
             query = parse_qs(urlparse(self.path).query)
             end = query.get('end', [None])[0]
+            origin = query.get('origin', [None])[0]
             data = waveform(source, query.get('joint', [''])[0], float(query.get('start', [0])[0]),
-                            float(end) if end is not None else None, int(query.get('width', [1000])[0]))
+                            float(end) if end is not None else None, int(query.get('width', [1000])[0]),
+                            time_origin=float(origin) if origin is not None else None)
             self._send(200, json.dumps(data, allow_nan=False).encode(), 'application/json', head)
         except ValueError as exc:
             self._send(400, str(exc).encode(), 'text/plain; charset=utf-8', head)
@@ -258,11 +213,8 @@ class Handler(BaseHTTPRequestHandler):
             return
         if name == "report.html":
             document, events = load_run(run_dir)
-            stored = run_dir / "report.html"
-            if document.get("result") != "running" and stored.exists():
-                body = stored.read_bytes()
-            else:
-                body = render(document, events, run_dir).encode()
+            # Render archived runs with the current UI too; do not rewrite their evidence.
+            body = render(document, events, run_dir).encode()
             self._send(200, body, "text/html; charset=utf-8", head)
             return
         target = run_dir / name
@@ -286,10 +238,51 @@ class Handler(BaseHTTPRequestHandler):
     def do_HEAD(self):  # noqa: N802
         self._route(True)
 
+    def do_POST(self):  # noqa: N802
+        path = unquote(urlparse(self.path).path)
+        if path != "/live/zero":
+            self._refuse()
+            return
+        origin = self.headers.get("Origin")
+        if origin and urlparse(origin).netloc != self.headers.get("Host"):
+            self._send(403, json.dumps({"error": "跨站请求已拒绝"}, ensure_ascii=False).encode(),
+                       "application/json; charset=utf-8", False)
+            return
+        if self.headers.get_content_type() != "application/json":
+            self._send(415, json.dumps({"error": "需要 application/json"}, ensure_ascii=False).encode(),
+                       "application/json; charset=utf-8", False)
+            return
+        try:
+            length = int(self.headers.get("Content-Length", "0"))
+            if not 0 < length <= 4096:
+                raise ValueError("invalid content length")
+            request = json.loads(self.rfile.read(length))
+            sensor = request.get("sensor")
+            action = request.get("action")
+            if sensor not in live.FORCE_SENSORS or action not in ("capture", "disable"):
+                raise ValueError("invalid sensor or action")
+            if action == "capture":
+                row = live.current_force_sensor(live.snapshot(self.archive, self.enums), sensor)
+                if row is None or any(value is None for value in row.get("raw", [])):
+                    self._send(409, json.dumps({"error": "该臂当前没有新鲜、完整的六轴样本，未修改零点"}, ensure_ascii=False).encode(),
+                               "application/json; charset=utf-8", False)
+                    return
+                live.save_force_zero(self.archive, sensor, row["raw"], "live-panel-current-sample")
+                message = f"{live.FORCE_SENSORS[sensor]}软件零点已更新"
+            else:
+                live.save_force_zero(self.archive, sensor, None, "live-panel-disable")
+                message = f"{live.FORCE_SENSORS[sensor]}已恢复显示未清零值"
+            self._send(200, json.dumps({"ok": True, "message": message}, ensure_ascii=False).encode(),
+                       "application/json; charset=utf-8", False)
+        except (ValueError, TypeError, json.JSONDecodeError):
+            self._send(400, json.dumps({"error": "请求格式无效"}, ensure_ascii=False).encode(),
+                       "application/json; charset=utf-8", False)
+
+
     def _refuse(self):
         self._send(405, b"read-only", "text/plain", False)
 
-    do_POST = do_PUT = do_DELETE = do_PATCH = _refuse
+    do_PUT = do_DELETE = do_PATCH = _refuse
 
 
 def serve(archive: Archive, host: str, port: int, enums: Optional[dict] = None,

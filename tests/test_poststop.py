@@ -6,7 +6,15 @@ from runtime_log.ethercat import EthercatPoller
 from runtime_log.poststop import read_post_stop, summarize
 
 FIXTURES = Path(__file__).resolve().parent / "fixtures"
-SETTINGS = {"drive_name_regex": "ZeroErr", "error_codes": {0xA000: "master left OP"}, "expected_codes": [0xA000]}
+SETTINGS = {"drive_name_regex": "ZeroErr", "expected_codes": [0xA000]}
+# Code names come from the artifact (robot_driver diagnostics.yaml fault tables).
+DIAGNOSTICS = """\
+fault_tables:
+  zeroerr_erob:
+    vendor: ZeroErr
+    faults:
+    - {code: '0xA000', message: master left OP, page: 143}
+"""
 
 
 def poller(phase: str, codes: dict, fail=()):
@@ -30,13 +38,14 @@ def poller(phase: str, codes: dict, fail=()):
     return EthercatPoller(runner=runner), calls
 
 
-def test_reads_error_code_and_status_of_every_drive_once():
+def test_reads_error_code_and_status_of_every_drive_once(tmp_path):
     instance, calls = poller("Idle", {1: 0xA000})
-    result = read_post_stop(instance, SETTINGS)
+    (tmp_path / "diagnostics.yaml").write_text(DIAGNOSTICS)
+    result = read_post_stop(instance, SETTINGS, tmp_path)
     assert result["skipped"] is None and result["master_phase"] == "Idle"
     assert [d["position"] for d in result["drives"]] == [1, 2, 3, 4, 5, 6, 7]  # couplers skipped
     first = result["drives"][0]
-    assert first["error_code_hex"] == "0xA000" and first["error_text"] == "master left OP"
+    assert first["error_code_hex"] == "0xA000" and first["error_text"] == "master left OP（ZeroErr 手册 p143）"
     assert first["status_word_hex"] == "0x0250" and first["fault"] is False
     uploads = [argv for argv in calls if argv[1] == "upload"]
     assert len(uploads) == 14 and {argv[-2] for argv in uploads} == {"0x603F", "0x6041"}

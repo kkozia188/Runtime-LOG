@@ -129,6 +129,8 @@ def _anomalies(events: list[Event], shutdown_ts: Optional[float], optional: set 
             counts["operator.requests"] += 1
             if not event.data.get("ok", True):
                 counts["operator.rejected"] += 1
+        elif event.kind == "blackbox" and event.rule == "blackbox_error":
+            counts["blackbox.archive_errors"] += 1
         elif event.kind == "blackbox" and event.rule == "blackbox_saved":
             counts["blackbox.saved"] += 1
             for reason in event.data.get("reasons", []):

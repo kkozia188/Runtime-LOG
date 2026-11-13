@@ -1,0 +1,22 @@
+{
+  "release": "arm-20261107-controller-error-capture",
+  "source_base": "25aade1f33f1dfd176f2c705609bf30cebf4a79d",
+  "includes_uncommitted_workspace": true,
+  "previous_arm_head": "3996180b6dab871d59218a7c67219041ac5bd150",
+  "preserved_arm_files": [
+    "profiles/rt_control.yaml",
+    "runtime_log/live.py",
+    "runtime_log/console_audit.py",
+    "runtime_log/poststop.py"
+  ],
+  "integration_notes": [
+    "Existing force sensor decoding and software display-zero endpoint preserved, no zero operation performed by deployment.",
+    "Live page wrapped with shared new navigation and minimum 14px helper text.",
+    "Poststop reads artifact diagnostics with fallback to configured error names; recorder passes artifact dir.",
+    "Host profile retains integ_bringup discovery, integ_operator_web audit, feedback_stale 50ms and device_offline enum.",
+    "Field-dependent regression tests use active profile threshold and audit path rather than hardcoded old defaults.",
+    "Capture fresh configured-controller ERROR/FATAL using existing blackbox, deduplicate triggers within 2s, never replay historical faults; reset stale evidence picker label."
+  ],
+  "validation": "144 local Python tests passed, including rejected-goal 12s capture",
+  "previous_release": "arm-20261107-reliable-capture-ui"
+}

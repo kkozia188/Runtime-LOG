@@ -8,34 +8,15 @@ import time
 from pathlib import Path
 from typing import Optional
 
-from .model import CONTROL, ECAT, ERROR, FAILURE, PROCESS_EXITED, PROCESS_STARTED, SHUTDOWN, SIGNAL, STAGE, WARNING, Event
+from .model import CONTROL, ECAT, ERROR, FAILURE, PROCESS_EXITED, SHUTDOWN, SIGNAL, STAGE, WARNING, Event
 from .timeline import is_anomaly_key_informational
+from .ui import CSS as CSS  # Compatibility export for secondary report renderers.
+from .ui import document
 
 RESULT_LABEL = {"ok": "正常结束", "failed": "失败", "running": "运行中", "aborted": "未正常结束", "interrupted": "记录中断"}
 RESULT_COLOR = {"ok": "#1a7f37", "failed": "#cf222e", "running": "#0969da", "aborted": "#9a6700", "interrupted": "#9a6700"}
 STATE_COLOR = {"INIT": "#d0d7de", "PREOP": "#f2cc60", "BOOT": "#bf8700", "SAFEOP": "#54aeff", "OP": "#2da44e", "?": "#ffffff"}
 PALETTE = ["#0969da", "#cf222e", "#1a7f37", "#8250df", "#bf8700", "#1b7c83", "#d1242f", "#57606a"]
-
-CSS = """
-body{font:14px/1.45 system-ui,-apple-system,"Segoe UI","Noto Sans CJK SC",sans-serif;margin:0;color:#1f2328;background:#f6f8fa}
-main{max-width:1280px;margin:0 auto;padding:16px 20px 48px}
-h1{font-size:20px;margin:8px 0}h2{font-size:16px;margin:28px 0 8px;border-bottom:1px solid #d0d7de;padding-bottom:4px}
-.badge{display:inline-block;white-space:nowrap;padding:2px 10px;border-radius:12px;color:#fff;font-weight:600}
-.card{background:#fff;border:1px solid #d0d7de;border-radius:6px;padding:12px 16px;margin:8px 0}
-.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:4px 16px}
-.k{color:#59636e;font-size:12px}.v{font-weight:600;word-break:break-all}
-table{border-collapse:collapse;width:100%;background:#fff;font-size:13px}
-th,td{border:1px solid #d0d7de;padding:3px 6px;text-align:left;vertical-align:top}th{background:#f6f8fa}
-td.num{text-align:right;font-variant-numeric:tabular-nums}
-tr.error td{background:#ffebe9}tr.warn td{background:#fff8c5}tr.hit td{background:#ffebe9;font-weight:600}
-.fail{border-left:4px solid #cf222e}.mono{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12px}
-svg{background:#fff;border:1px solid #d0d7de;border-radius:6px;display:block}
-svg text{font:11px system-ui,sans-serif;fill:#1f2328}
-.legend span{display:inline-block;margin-right:12px;font-size:12px}.legend i{display:inline-block;width:10px;height:10px;margin-right:4px;vertical-align:middle}
-details summary{cursor:pointer;color:#0969da}.filters label{margin-right:12px;font-size:13px}
-a{color:#0969da}
-"""
-
 
 def esc(value) -> str:
     return html.escape("" if value is None else str(value))
@@ -108,7 +89,7 @@ def gantt(summary: dict, events: list[Event], ecat_rows: list[dict], t0: float, 
     ecat_rows = [r for r in ecat_rows if r.get("t", 0) <= t_max]
     rows: list[str] = []
     labels: list[str] = []
-    row_h = 20
+    row_h = 27
     y = 8
 
     def row_label(text: str) -> None:
@@ -189,7 +170,7 @@ def gantt(summary: dict, events: list[Event], ecat_rows: list[dict], t0: float, 
     height = y + 24
     body = scale.axis(4, y) + "".join(rows) + "".join(labels)
     legend = "".join(f'<span><i style="background:{c}"></i>{s}</span>' for s, c in STATE_COLOR.items() if s != "?")
-    return f'<svg width="{scale.width}" height="{height}" viewBox="0 0 {scale.width} {height}">{body}</svg><div class="legend">{legend}<span>竖线悬停可看详情</span></div>'
+    return f'<div class="chart-scroll"><svg role="img" aria-label="运行阶段与事件时间线" width="{scale.width}" height="{height}" viewBox="0 0 {scale.width} {height}">{body}</svg></div><div class="legend">{legend}<span>竖线悬停可看详情</span></div>'
 
 
 def line_chart(series: dict[str, list[tuple[float, float]]], t_max: float, unit: str, title: str, signed: bool = False) -> str:
@@ -226,7 +207,7 @@ def line_chart(series: dict[str, list[tuple[float, float]]], t_max: float, unit:
         legend.append(f'<span><i style="background:{color}"></i>{esc(name)} 峰值 {peak:.4g}{unit}</span>' if signed else
                       f'<span><i style="background:{color}"></i>{esc(name)} 峰值 {max(v for _, v in points):.1f}{unit}</span>')
     total = height + top + 22
-    return f'<div class="k">{esc(title)}</div><svg width="{scale.width}" height="{total}" viewBox="0 0 {scale.width} {total}">{"".join(parts)}</svg><div class="legend">{"".join(legend)}</div>'
+    return f'<h3>{esc(title)}</h3><div class="chart-scroll"><svg role="img" aria-label="{esc(title)}" width="{scale.width}" height="{total}" viewBox="0 0 {scale.width} {total}">{"".join(parts)}</svg></div><div class="legend">{"".join(legend)}</div>'
 
 
 def resource_series(resources: list[dict]) -> tuple[dict, dict, dict]:
@@ -428,36 +409,56 @@ def render(run: dict, events: list[Event], run_dir: Optional[Path] = None) -> st
     window = startup_window(summary)
     zoom = f"<h2>时间线（启动放大，0–{window:.1f} s）</h2>{gantt(summary, events, ecat_rows, t0, window)}" if window else ""
     color = RESULT_COLOR.get(result, "#57606a")
-    return f"""<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>{esc(run.get("id"))} · Runtime-LOG</title><style>{CSS}</style></head><body><main>
-<p><a href="../">← 全部运行</a></p>
-<h1>{esc(run.get("id"))} <span class="badge" style="background:{color}">{esc(RESULT_LABEL.get(result, result))}</span></h1>
-{failure_html}
-<div class="card grid">{facts_html}</div>
-<h2>异常计数</h2><table style="max-width:520px"><tr><th>项目</th><th>次数</th></tr>{anomaly_rows}</table>
-<h2>1 kHz 黑匣子</h2>{blackbox_section(run, events, t0)}
-<h2>1 kHz 性能实验</h2>{experiments_section(run, run_dir)}
-<h2>停后驱动错误码</h2>{post_stop_section(run)}
-{send_trace_section(run)}
-{zoom}<h2>时间线（全程）</h2>{gantt(summary, events, ecat_rows, t0, t_max)}
-<h2>启动步骤</h2><table><tr><th>t (s)</th><th>步骤</th><th>原文</th></tr>{stage_rows or '<tr><td colspan="3">无</td></tr>'}</table>
-<h2>资源</h2>{line_chart(cpu, t_max, "%", "进程 CPU（%，单核 = 100）")}{line_chart(rss, t_max, " MiB", "进程常驻内存（MiB）")}{line_chart(threads, t_max, "%", "ros2_control_node 线程 CPU（前 8）")}
-<h2>ros2_control_node 线程</h2><table><tr><th>tid</th><th>名称</th><th>策略</th><th>RT 优先级</th><th>允许 CPU</th><th>实际运行 CPU</th><th>峰值 CPU %</th><th>首次出现 (s)</th></tr>{thread_rows or '<tr><td colspan="8">无采样</td></tr>'}</table>
-<h2>EtherCAT 主站计数</h2>{counters_table(ecat_rows)}{phase_counters(summary)}
-<h2>事件</h2><div class="filters"><label><input type="checkbox" id="onlyIssues"> 只看 WARN/ERROR</label><label><input type="checkbox" id="hideControl"> 隐藏控制事件</label></div>
-<table id="events"><tr><th>t (s)</th><th>类型</th><th>来源</th><th>对象</th><th>规则</th><th>内容</th></tr>{"".join(event_rows)}</table>
-<h2>部署与版本</h2>
-<table><tr><th>控制器</th><th>类型</th></tr>{controller_rows or '<tr><td colspan="2">-</td></tr>'}</table><br>
-<table><tr><th>仓库</th><th>分支</th><th>HEAD</th><th>未提交文件</th><th>diff sha256</th></tr>{git_rows or '<tr><td colspan="5">-</td></tr>'}</table><br>
-<table><tr><th>部署文件</th><th>sha256</th></tr>{hashes or '<tr><td colspan="2">-</td></tr>'}</table>
-<details><summary>启动参数与主机</summary><pre class="mono">{meta_json}</pre></details>
-<p class="k">生成于 {fmt_time(time.time())} · Runtime-LOG</p>
-</main><script>
+    from .analysis import render_analysis
+
+    def section(key: str, title: str, content: str) -> str:
+        return f'<details class="report-section" id="{key}"><summary>{title}</summary>{content}</details>'
+
+    diagnostics = section('recordings', '黑匣子与数据记录',
+        '<h2>1 kHz 黑匣子</h2>' + blackbox_section(run, events, t0)
+        + '<h2>1 kHz 性能实验 / 连续记录</h2>' + experiments_section(run, run_dir))
+    diagnostics += section('startup', '完整时间线与启动步骤', failure_html + zoom
+        + '<h2>时间线（全程）</h2>' + gantt(summary, events, ecat_rows, t0, t_max)
+        + '<h2>启动步骤</h2><table><tr><th>t (s)</th><th>步骤</th><th>原文</th></tr>'
+        + (stage_rows or '<tr><td colspan="3">无</td></tr>') + '</table>')
+    diagnostics += section('resources', '资源与线程',
+        line_chart(cpu, t_max, '%', '进程 CPU（%，单核 = 100）')
+        + line_chart(rss, t_max, ' MiB', '进程常驻内存（MiB）')
+        + line_chart(threads, t_max, '%', 'ros2_control_node 线程 CPU（前 8）')
+        + '<h2>ros2_control_node 线程</h2><table><tr><th>tid</th><th>名称</th><th>策略</th><th>RT 优先级</th><th>允许 CPU</th><th>实际运行 CPU</th><th>峰值 CPU %</th><th>首次出现 (s)</th></tr>'
+        + (thread_rows or '<tr><td colspan="8">无采样</td></tr>') + '</table>')
+    diagnostics += section('bus', 'EtherCAT 与驱动诊断',
+        '<h2>异常计数</h2><table><tr><th>项目</th><th>次数</th></tr>' + anomaly_rows + '</table>'
+        + '<h2>EtherCAT 主站计数</h2>' + counters_table(ecat_rows) + phase_counters(summary)
+        + '<h2>停后驱动错误码</h2>' + post_stop_section(run) + send_trace_section(run))
+    diagnostics += section('all-events', '全部事件与原始文件',
+        '<div class="filters"><label><input type="checkbox" id="onlyIssues"> 只看 WARN/ERROR</label><label><input type="checkbox" id="hideControl"> 隐藏控制事件</label></div>'
+        + '<table id="events"><tr><th>t (s)</th><th>类型</th><th>来源</th><th>对象</th><th>规则</th><th>内容</th></tr>' + ''.join(event_rows) + '</table>'
+        + '<div class="raw-data">' + ''.join(f'<a href="{name}">{name}</a>' for name in ('run.json', 'events.jsonl', 'resources.jsonl', 'ethercat.jsonl', 'launch.log.gz')) + '</div>')
+    diagnostics += section('deployment', '运行信息、部署与版本', '<div class="card grid">' + facts_html + '</div>'
+        + '<h2>部署与版本</h2><table><tr><th>控制器</th><th>类型</th></tr>' + (controller_rows or '<tr><td colspan="2">-</td></tr>') + '</table><br>'
+        + '<table><tr><th>仓库</th><th>分支</th><th>HEAD</th><th>未提交文件</th><th>diff sha256</th></tr>' + (git_rows or '<tr><td colspan="5">-</td></tr>') + '</table><br>'
+        + '<table><tr><th>部署文件</th><th>sha256</th></tr>' + (hashes or '<tr><td colspan="2">-</td></tr>') + '</table>'
+        + '<details><summary>启动参数与主机</summary><pre class="mono">' + meta_json + '</pre></details>')
+    scope_title = {'chassis_only': '底盘', 'arms_only': '机械臂'}.get(run.get('scope'), run.get('scope') or '运行')
+    demo_note = '<span class="badge warning">示例数据 · 非真实运行</span>' if run.get('source') == 'synthetic-demo' else ''
+    body = f'''<div class="breadcrumb"><a href="/">异常分析</a><span>/</span>运行详情 {demo_note}</div>
+<div class="page-heading"><div><h1>{esc(scope_title)}<span class="scope-label">故障分析</span></h1></div><div class="heading-actions"><span class="badge" style="background:{color}">{esc(RESULT_LABEL.get(result, result))}</span><button type="button" onclick="location.reload()">刷新</button></div></div>
+<div class="summary-strip"><span>开始 <strong>{fmt_time(run.get('start'))}</strong></span><span>时长 <strong>{fmt_s(summary.get('duration_s'))}</strong></span><span>硬件 <strong>{esc(run.get('hardware') or '未知')}</strong></span><span>域 <strong>{esc(run.get('domain'))}</strong></span></div>
+<nav class="section-nav" aria-label="运行证据导航"><a href="#analysis">联动分析</a><a href="#recordings">黑匣子与记录</a><a href="#startup">完整时间线</a><a href="#resources">资源与线程</a><a href="#bus">总线与驱动</a><a href="#deployment">部署与版本</a><a href="#all-events">原始事件</a></nav>
+{render_analysis(run, events, run_dir)}
+<h2 class="evidence-end">更多证据</h2>{diagnostics}
+<footer class="footer"><span class="mono">{esc(run.get('id'))}</span><span>快照 {fmt_time(time.time())}</span></footer>'''
+    script = '''<script>(()=>{
 const rows=[...document.querySelectorAll('#events tr[data-level]')];
-function apply(){{const issues=document.getElementById('onlyIssues').checked,hide=document.getElementById('hideControl').checked;
-rows.forEach(r=>{{const lv=r.dataset.level,k=r.dataset.kind;r.style.display=((issues&&lv==='info'&&k!=='failure')||(hide&&k==='control'))?'none':''}})}}
+function apply(){const issues=document.getElementById('onlyIssues').checked,hide=document.getElementById('hideControl').checked;
+rows.forEach(r=>{const lv=r.dataset.level,k=r.dataset.kind;r.hidden=(issues&&lv==='info'&&k!=='failure')||(hide&&k==='control')})}
 document.getElementById('onlyIssues').onchange=apply;document.getElementById('hideControl').onchange=apply;
-</script></body></html>"""
+function openSection(){const id=location.hash.slice(1),target=document.getElementById(id);if(target&&target.tagName==='DETAILS'){target.open=true;target.scrollIntoView()}}
+document.querySelectorAll('.section-nav a').forEach(link=>link.addEventListener('click',()=>{const target=document.getElementById(link.hash.slice(1));if(target&&target.tagName==='DETAILS')target.open=true}));
+window.addEventListener('hashchange',openSection);openSection();
+})();</script>'''
+    return document(str(run.get('id') or '运行'), body, 'issues', script)
 
 
 def write_report(run_dir: Path, run: dict, events: list[Event]) -> Path:

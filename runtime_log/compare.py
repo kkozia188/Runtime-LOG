@@ -65,6 +65,7 @@ def keyed(a: dict, b: dict) -> list[tuple[str, Any, Any]]:
 
 
 def render_compare(run_a: dict, events_a: list[Event], run_b: dict, events_b: list[Event]) -> str:
+    from .ui import frame_page
     def head(run: dict, tag: str) -> str:
         result = run.get("result", "?")
         color = RESULT_COLOR.get(result, "#57606a")
@@ -154,5 +155,5 @@ def render_compare(run_a: dict, events_a: list[Event], run_b: dict, events_b: li
         return out
 
     sections.append(table("停后错误码（0x603F / 0x6041）", keyed(post_stop(run_a), post_stop(run_b))))
-    return (f'<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><title>对比 · Runtime-LOG</title><style>{CSS}</style></head>'
+    return frame_page(f'<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><title>对比 · Runtime-LOG</title><style>{CSS}</style></head>'
             f'<body><main><p><a href="/">← 全部运行</a></p><h1>两次运行对比</h1>{"".join(sections)}</main></body></html>')

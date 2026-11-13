@@ -1,6 +1,7 @@
 """C++ writer (shm_ring.hpp via shm_bench) <-> Python reader interoperability and torn-read safety."""
 
 import os
+import select
 import shutil
 import subprocess
 import time
@@ -65,25 +66,35 @@ def test_reader_reports_overwritten_cycles_as_gaps(bench):
 
 def test_concurrent_reading_never_returns_torn_slots(bench):
     name = segment_name("race")
-    process = subprocess.Popen([str(bench), "--name", name, "--fields", "64", "--slots", "32", "--cycles", "3000000", "--period-us", "0", "--pattern"],
-                               stdout=subprocess.DEVNULL)
+    process = subprocess.Popen([str(bench), "--name", name, "--fields", "64", "--slots", "32", "--period-us", "0", "--pattern", "--stream"],
+                               stdin=subprocess.PIPE, stdout=subprocess.PIPE)
+    reader = None
     try:
-        path = SHM_DIR / name[1:]
-        deadline = time.time() + 5
-        while not path.exists() and time.time() < deadline:
-            time.sleep(0.01)
-        time.sleep(0.05)
-        reader = ShmReader(path)
+        # A fixed cycle count may finish before the reader is scheduled on a fast host.
+        assert select.select([process.stdout], [], [], 5)[0], "writer did not become ready"
+        assert process.stdout.readline() == b"ready\n"
+        reader = ShmReader(SHM_DIR / name[1:])
+        process.stdin.write(b"start\n")
+        process.stdin.flush()
         valid = gaps = 0
-        end = time.time() + 1.5
-        while time.time() < end and process.poll() is None:
+        end = time.monotonic() + 10
+        previous = 0
+        while valid <= 1000 and time.monotonic() < end:
+            assert process.poll() is None, "stress writer exited early"
             batch = reader.read()
             gaps += batch.gaps
             for seq, values in zip(batch.seqs, batch.values):
-                assert values[0] == seq * 1000.0 and values[-1] == seq * 1000.0 + 63, f"torn slot {seq}"
+                assert seq > previous
+                previous = seq
+                assert values == tuple(seq * 1000.0 + i for i in range(64)), f"torn slot {seq}"
                 valid += 1
-        assert valid > 1000  # a tiny ring under a full-speed writer: many gaps, but never a torn slot
+        assert valid > 1000
+        assert gaps > 0  # Exercise real overwrites, not only the uncontended path.
     finally:
         process.kill()
         process.wait()
+        process.stdin.close()
+        process.stdout.close()
+        if reader is not None:
+            reader.close()
         (SHM_DIR / name[1:]).unlink(missing_ok=True)
