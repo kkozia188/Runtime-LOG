@@ -14,7 +14,7 @@ from typing import Optional
 from urllib.parse import parse_qs, unquote, urlparse
 
 from .archive import INDEX, RUN_FILE, Archive, read_json
-from . import live
+from . import anomalies, live
 from .compare import render_compare
 from .export import mcap_to_csv
 from .waveform import waveform
@@ -123,6 +123,15 @@ class Handler(BaseHTTPRequestHandler):
             return
         if parts == ["live.json"]:
             body = json.dumps(live.snapshot(self.archive, self.enums), ensure_ascii=False).encode()
+            self._send(200, body, "application/json", head)
+            return
+        if parts == ["anomalies.json"]:
+            try:
+                since = anomalies.parse_since(parse_qs(urlparse(self.path).query).get("since", [""])[0])
+            except ValueError as exc:
+                self._send(400, str(exc).encode(), "text/plain; charset=utf-8", head)
+                return
+            body = json.dumps(anomalies.snapshot(self.archive, since), ensure_ascii=False, allow_nan=False).encode()
             self._send(200, body, "application/json", head)
             return
         if parts == ["compare_experiments"]:
